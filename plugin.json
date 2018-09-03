@@ -1,0 +1,11 @@
+{
+  "id": "com.webimage.Node",
+  "name": "Node Manager",
+  "version": "1.0.0",
+  "namespace": "WebImage\\Node",
+  "requirements": {
+    "plugins": [
+      "com.webimage.Form"
+    ]
+  }
+}

@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<dictionary>
+    <namespaces>
+        <namespace uri="http://www.cwimage.com/model/core" prefix="cwi"/>
+        <namespace uri="http://www.cwimage.com/model/extension" prefix="ext"/>
+        <namespace uri="http://www.cwimage.com/system" prefix="sys"/>
+    </namespaces>
+    <types>
+        <type>
+            <qname>cwi:root</qname>
+            <model name="cnodes" dataSaver="CWI_CNODE_Root" />
+        </type>
+        <type>
+            <qname>sys:type</qname>
+            <model name="cnode_types" />
+        </type>
+        <type isSubClassable="true">
+            <qname>cwi:base</qname>
+            <parent>cwi:root</parent>
+            <friendlyName>Title</friendlyName>
+            <model name="cnode_base" />
+            <properties>
+                <property name="title" friendlyName="Title" searchable="true" propertyClass="CustomTitlePropertyClass" /> <!-- CustomTitltePropertyClass would need to extends a lower level property -->
+            </properties>
+        </type>
+        <type isSubClassable="true">
+            <qname>cwi:content</qname>
+            <parent>cwi:base</parent>
+            <model name="cnode_content" />
+            <friendlyName>Content</friendlyName>
+            <enableLocales>false</enableLocales>
+            <enableProfiles>false</enableProfiles>
+            <extensions>
+                <extension name="ext:ownable" />
+            </extensions>
+            <properties>
+                <property name="body" friendlyName="Body" searchable="true" />
+            </properties>
+        </type>
+    </types>
+    <extensions>
+        <extension qname="ext:ownable">
+            <model name="cnode_publishable" />
+        </extension>
+        <extension qname="ext:authorable">
+            <associations>
+                <child-association qname="cwi:author">
+                    <source>
+                        <mandatory>false</mandatory>
+                        <many>true</many>
+                    </source>
+                    <target>
+                        <class>sys:base</class>
+                        <mandatory>false</mandatory>
+                        <many>true</many>
+                    </target>
+                </child-association>
+            </associations>
+        </extension>
+    </extensions>
+    <dataTypes>
+        <!--
+        <dataType name="d:any">
+            <phpType>string</phpType>
+            <databaseType>text</databaseType>
+        </dataType>
+        -->
+        <dataType type="d:singleline" name="Single Line" defaultInputElementClass="TextInputElement">
+            <phpType>string</phpType>
+            <modelFieldType hasSize="true" type="varchar" size="255" />
+        </dataType>
+
+        <dataType type="d:text" name="Paragraph" defaultInputElementClass="WysiwygInputElement">
+            <phpType>string</phpType>
+            <modelFieldType type="text" />
+            <!-- Analyzer: AlfrescoStandardAnalyzer -->
+        </dataType>
+        <dataType type="d:int" defaultInputElementClass="TextInputElement">
+            <phpType>int</phpType>
+            <modelFieldType type="int" />
+            <!-- Analyzer: IntegerAnalyser -->
+        </dataType>
+        <dataType type="d:date" name="Date" defaultInputElementClass="TextInputElement">
+            <phpType>string</phpType>
+            <modelFieldType type="date" />
+            <!-- Analayzer: DateAnalyser -->
+        </dataType>
+
+        <dataType type="d:datetime" name="Date/Time" defaultInputElementClass="TextInputElement">
+            <phpType>string</phpType>
+            <modelFieldType type="datetime" />
+            <!-- Analyzer: DateTimeAnalyser -->
+        </dataType>
+
+        <dataType type="d:boolean" name="True/False" defaultInputElementClass="TextInputElement">
+            <phpType>boolean</phpType>
+            <modelFieldType type="tinyint" />
+        </dataType>
+
+        <dataType type="d:qname" defaultInputElementClass="TextInputElement">
+            <phpType>string</phpType>
+            <modelFieldType type="varchar" size="255" />
+        </dataType>
+
+        <dataType type="d:noderef" name="Reference" defaultInputElementClass="TextInputElement">
+            <!--<phpClassName>CWI_REPO_SERVICE_NodeRef</phpClassName>-->
+            <modelFieldType type="varchar" size="255" />
+        </dataType>
+
+        <dataType type="d:childassocref" _name="Reference Multiple" defaultInputElementClass="TextInputElement">
+            <modelFieldType>CWI_REPO_SERVICE_ChildAssociationRef</modelFieldType>
+        </dataType>
+
+        <dataType type="d:assocref" defaultInputElementClass="TextInputElement">
+            <phpClassName>CWI_REPO_SERVICE_AssociationRef</phpClassName>
+        </dataType>
+
+        <dataType type="d:category" defaultInputElementClass="TextInputElement">
+            <phpType>string</phpType>
+        </dataType>
+
+        <dataType type="d:user" name="User" defaultInputElementClass="TextInputElement">
+            <!--
+            <phpClassName>CWI_CNODE_DATATYPE_User</phpClassName>
+            <phpClassFile>~plugin.cnode/libraries/cnode/dictionary/datatype/user</phpClassFile>
+            -->
+            <modelFieldType type="int" />
+        </dataType>
+
+        <dataType type="d:file" name="File" defaultInputElementClass="FileUploadElement">
+            <phpClassName>CWI_CNODE_DATATYPE_File</phpClassName>
+            <phpClassFile>~plugin.cnode/libraries/cnode/dictionary/datatype/file.php</phpClassFile>
+            <modelFieldType type="int" />
+        </dataType>
+
+        <dataType type="d:embeddedmedia" name="Embedded Media" defaultInputElementClass="CWI_CNODE_FORMBUILDER_EmbeddedMediaElement">
+            <modelFieldType name="embed" type="text" />
+            <modelFieldType name="value" type="varchar" size="255" />
+            <modelFieldType name="provider" type="varchar" size="255" />
+            <modelFieldType name="data" type="text" />
+        </dataType>
+        <dataType type="d:link" name="Link" defaultInputElementClass="LinkInputElement">
+            <modelFieldType name="url" type="varchar" size="255" />
+            <modelFieldType name="title" type="varchar" size="255" />
+        </dataType>
+        <!--
+        Support for this coming soon:
+        <inputElements>
+            <inputElement className="TextInputElement" classFile="~/libraries/formbuilder.php">
+                <supportedDataTypes>
+                    <add dataType="d:singleline" />
+                </supportedDataTypes>
+            </inputElement>
+        </inputElements>
+        -->
+    </dataTypes>
+</dictionary>
