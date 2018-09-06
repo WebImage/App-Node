@@ -5,7 +5,6 @@ namespace WebImage\Node\Defs;
 use WebImage\Config\Config;
 use WebImage\Core\Dictionary;
 use WebImage\Node\Defs\NodeTypePropertyDictionary;
-use WebImage\Node\Service\QName;
 
 class NodeTypeDef {
 	/**
@@ -21,7 +20,7 @@ class NodeTypeDef {
 	 */
 	private $pluralName;
 	/**
-	 * @property QName The internal naming mechanism for types
+	 * @property string The internal naming mechanism for types
 	 */
 	private $qname;
 	/**
@@ -41,11 +40,11 @@ class NodeTypeDef {
 	 */
 	private $properties;
 	/**
-	 * @property array $associations a collection of QNames that can be used to reference AssociationDef's
+	 * @property array $associations a collection of qnames that can be used to reference AssociationDef's
 	 */
 	private $associations = [];
 	/**
-	 * @property array $extensions a collection of QNames that can be used to reference NodeTypeExtensionDef's
+	 * @property array $extensions a collection of qnames that can be used to reference NodeTypeExtensionDef's
 	 */
 	private $extensions = [];
 	/**
@@ -57,7 +56,7 @@ class NodeTypeDef {
 	 */
 	private $subClassable;
 
-	public function __construct($parent=null, $name=null, $pluralName=null, QName $qname=null, Config $config=null, $uuid=null, $version=null) {
+	public function __construct($parent=null, $name=null, $pluralName=null, $qname=null, Config $config=null, $uuid=null, $version=null) {
 		if (null === $config) $config = new Config();
 		$this->properties = new NodeTypePropertyDictionary();
 		$this->setParent($parent);
@@ -120,7 +119,7 @@ class NodeTypeDef {
 	}
 
 	/**
-	 * @return \WebImage\Node\Defs\NodeTypePropertyDictionary
+	 * @return \WebImage\Node\Defs\NodeTypePropertyDictionary|\WebImage\Node\Defs\NodeTypePropertyDef[]
 	 */
 	public function getProperties()
 	{
@@ -137,21 +136,33 @@ class NodeTypeDef {
 		return $this->properties->get($name);
 	}
 
+	/**
+	 * @return string|null
+	 */
 	public function getParent()
 	{
 		return $this->parent;
 	}
 
+	/**
+	 * @return array
+	 */
 	public function getAssociations()
 	{
 		return $this->associations;
 	}
 
+	/**
+	 * @return array
+	 */
 	public function getExtensions()
 	{
 		return $this->extensions;
 	}
 
+	/**
+	 * @return bool
+	 */
 	public function isExtension()
 	{
 		return false;
@@ -170,7 +181,10 @@ class NodeTypeDef {
 		$this->pluralName = $pluralName;
 	}
 
-	public function setQName(QName $qname = null)
+	/**
+	 * @param string $qname
+	 */
+	public function setQName($qname = null)
 	{
 		$this->qname = $qname;
 	}

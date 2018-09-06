@@ -18,7 +18,7 @@ class NodeTypePropertyDef
 	/**
 	 * @var string
 	 */
-	private $type;
+	private $qname;
 	/**
 	 * @var bool
 	 */
@@ -27,10 +27,6 @@ class NodeTypePropertyDef
 	 * @var mixed
 	 */
 	private $default;
-	/**
-	 * @var bool
-	 */
-	private $isMultiValued;
 	/**
 	 * @var int
 	 */
@@ -58,7 +54,7 @@ class NodeTypePropertyDef
 	 * @param string $nodeTypeTypeQName
 	 * @param string $key
 	 * @param string $name
-	 * @param string $type
+	 * @param string $qname
 	 * @param bool $required
 	 * @param mixed $default
 	 * @param bool $isMultiValued
@@ -67,12 +63,12 @@ class NodeTypePropertyDef
 	 *
 	 * @throws \Exception When invalid property configuration is specified
 	 */
-	function __construct($nodeTypeTypeQName, $key, $name, $type, $required = false, $default = null, $isMultiValued = false, $sortorder = null, Config $config = null)
+	function __construct($nodeTypeTypeQName, $key, $name, $qname, $required = false, $default = null, $isMultiValued = false, $sortorder = null, Config $config = null)
 	{
 		$this->setNodeTypeTypeQName($nodeTypeTypeQName);
 		$this->setKey($key);
 		$this->setName($name);
-		$this->setType($type);
+		$this->setQName($qname);
 		$this->isRequired($required);
 		$this->setDefault($default);
 		$this->isMultiValued($isMultiValued);
@@ -99,9 +95,9 @@ class NodeTypePropertyDef
 		return $this->name;
 	}
 
-	public function getType()
+	public function getQName()
 	{
-		return $this->type;
+		return $this->qname;
 	}
 
 	public function getDefault()
@@ -138,9 +134,9 @@ class NodeTypePropertyDef
 		$this->name = $name;
 	}
 
-	public function setType($type)
+	public function setQName($qname)
 	{
-		$this->type = $type;
+		$this->qname = $qname;
 	}
 
 	public function setDefault($default)

@@ -1,12 +1,12 @@
 <?php
 
-namespace WebImage\Node\Types;
+namespace WebImage\Node\DataTypes;
 
-class DateTimeType extends Type
+class DateTimeType extends DataType
 {
 	public function getTypeName()
 	{
-		return Type::DATETIME;
+		return DataType::DATETIME;
 	}
 
 	public function getName()

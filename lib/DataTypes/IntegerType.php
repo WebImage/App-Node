@@ -1,15 +1,15 @@
 <?php
 
-namespace WebImage\Node\Types;
+namespace WebImage\Node\DataTypes;
 
-class IntegerType extends Type
+class IntegerType extends DataType
 {
 	/**
 	 * @inheritdoc
 	 */
 	public function getTypeName()
 	{
-		return Type::INTEGER;
+		return DataType::INTEGER;
 	}
 
 	/**

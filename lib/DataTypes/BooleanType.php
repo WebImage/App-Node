@@ -1,12 +1,12 @@
 <?php
 
-namespace WebImage\Node\Types;
+namespace WebImage\Node\DataTypes;
 
-class BooleanType extends Type
+class BooleanType extends DataType
 {
 	public function getTypeName()
 	{
-		return Type::BOOLEAN;
+		return DataType::BOOLEAN;
 	}
 
 	public function getName()

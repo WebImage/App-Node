@@ -1,12 +1,12 @@
 <?php
 
-namespace WebImage\Node\Types;
+namespace WebImage\Node\DataTypes;
 
-class DecimalType extends Type
+class DecimalType extends DataType
 {
 	public function getTypeName()
 	{
-		return Type::DECIMAL;
+		return DataType::DECIMAL;
 	}
 
 	public function getName()

@@ -3,7 +3,7 @@
 /**
  * Heavily borrowed from Doctrine's Type::getType()
  */
-namespace WebImage\Node\Types;
+namespace WebImage\Node\DataTypes;
 
 abstract class Type {
 	const BOOLEAN = 'boolean';
@@ -17,13 +17,13 @@ abstract class Type {
 	private static $_resolvedTypes = [];
 
 	private static $_typeMap = [
-		self::BOOLEAN => 'WebImage\Node\Types\BooleanType',
-		self::DATE => 'WebImage\Node\Types\DateType',
-		self::DATETIME => 'WebImage\Node\Types\DateTimeType',
-		self::DECIMAL => 'WebImage\Node\Types\Decimal',
-		self::INTEGER => 'WebImage\Node\Types\IntegerType',
-		self::STRING => 'WebImage\Node\Types\StringType',
-		self::TEXT => 'WebImage\Node\Types\TextType'
+		self::BOOLEAN => 'WebImage\Node\DataTypes\BooleanType',
+		self::DATE => 'WebImage\Node\DataTypes\DateType',
+		self::DATETIME => 'WebImage\Node\DataTypes\DateTimeType',
+		self::DECIMAL => 'WebImage\Node\DataTypes\DecimalType',
+		self::INTEGER => 'WebImage\Node\DataTypes\IntegerType',
+		self::STRING => 'WebImage\Node\DataTypes\StringType',
+		self::TEXT => 'WebImage\Node\DataTypes\TextType'
 	];
 
 	/**
@@ -36,7 +36,7 @@ abstract class Type {
 	 *
 	 * @param string $name
 	 *
-	 * @return Type
+	 * @return DataType
 	 */
 	public static function getType($name)
 	{

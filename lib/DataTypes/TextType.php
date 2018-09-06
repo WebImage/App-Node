@@ -1,12 +1,12 @@
 <?php
 
-namespace WebImage\Node\Types;
+namespace WebImage\Node\DataTypes;
 
-class TextType extends Type
+class TextType extends DataType
 {
 	public function getTypeName()
 	{
-		return Type::TEXT;
+		return DataType::TEXT;
 	}
 
 	public function getName()

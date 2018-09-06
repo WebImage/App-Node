@@ -4,6 +4,7 @@ namespace WebImage\Node\Entities;
 
 use Exception;
 use RuntimeException;
+use WebImage\Core\Dictionary;
 use WebImage\Node\Defs\NodeTypeDef;
 use WebImage\Node\Defs\NodeTypePropertyDef;
 
@@ -50,7 +51,7 @@ class NodeType extends AbstractRepositoryEntity
 	 * @param bool $includeExtensions Determines whether all extensions should be included in the stack; true by default
 	 * @param array of NodeType
 	 *
-	 * @return void
+	 * @return NodeType[]
 	 */
 	public function getTypeStack($includeExtensions = true)
 	{
@@ -118,6 +119,14 @@ class NodeType extends AbstractRepositoryEntity
 	}
 
 	/**
+	 * Delete the node type from the service
+	 */
+	public function delete()
+	{
+		$this->getRepository()->getNodeTypeService()->delete($this);
+	}
+
+	/**
 	 * Creates a property definition and adds it to the list of properties
 	 *
 	 * @throws Exception
@@ -133,9 +142,9 @@ class NodeType extends AbstractRepositoryEntity
 			throw new Exception('Property already exists');
 		}
 
-		$qname_str = $this->getDef()->getQName()->toString();
+		$qname = $this->getDef()->getQName();
 
-		$def = $this->getRepository()->getNodeTypeService()->createPropertyDef($qname_str, $key, $name, $type, $required, $default, $isMultiValued, $sortorder, $config);
+		$def = $this->getRepository()->getNodeTypeService()->createPropertyDef($qname, $key, $name, $type, $required, $default, $isMultiValued, $sortorder, $config);
 
 		$this->getDef()->setProperty($key, $def);
 
@@ -156,22 +165,20 @@ class NodeType extends AbstractRepositoryEntity
 	/**
 	 * Retrieves all properties from this type's definition, all parent type definitions, and all extension definitions (as opposed to $this->getDef()->getProperties() which only returns properties for this properties definition
 	 *
-	 * @return Dictionary of property definitions
+	 * @return NodeTypePropertyDef[]|Dictionary of property definitions
 	 */
 	public function getProperties()
 	{
 		// Get all associated types for this type
-		$type_stack = $this->getTypeStack();
+		$typeStack = $this->getTypeStack();
 		// Instantiate return object
 		$properties = new Dictionary();
 
 		// Iterate through types and add properties to Dictionary
-		foreach ($type_stack as $type) {
-			$type_def = $type->getDef();
-			$type_properties = $type_def->getProperties()->getAll();
+		foreach ($typeStack as $type) {
 
-			while ($type_property = $type_properties->getNext()) {
-				$properties->set($type_property->getKey(), $type_property->getDef());
+			foreach($type->getDef()->getProperties() as $key => $property) {
+				$properties->set($key, $property);
 			}
 		}
 
