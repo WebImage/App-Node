@@ -13,4 +13,11 @@ interface NodeRefInterface {
 	 * @return string
 	 */
 	public function getUuid();
+
+	/**
+	 * Get the current version of the node reference
+	 *
+	 * @return long
+	 */
+	public function getVersion();
 }
