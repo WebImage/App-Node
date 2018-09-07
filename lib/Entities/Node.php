@@ -2,9 +2,12 @@
 
 namespace WebImage\Node\Entities;
 
-use WebImage\Node\Properties\MultiProperty;
+use WebImage\Node\Properties\InvalidPropertyException;
+use WebImage\Node\Properties\MultiValueProperty;
+use WebImage\Node\Properties\MultiValuePropertyInterface;
 use WebImage\Node\Properties\Property;
 use WebImage\Node\Properties\PropertyInterface;
+use WebImage\Node\Properties\SingleValuePropertyInterface;
 
 class Node extends AbstractRepositoryEntity {
 	/**
@@ -14,7 +17,7 @@ class Node extends AbstractRepositoryEntity {
 	/**
 	 * @var long
 	 */
-	private $version;
+//	private $version;
 	/**
 	 * @var NodeRefInterface
 	 */
@@ -42,7 +45,7 @@ class Node extends AbstractRepositoryEntity {
 
 	/**
 	 * Node constructor.
-	 * @param $typeQName
+	 * @param string $typeQName
 	 */
 	public function __construct($typeQName)
 	{
@@ -68,9 +71,9 @@ class Node extends AbstractRepositoryEntity {
 	{
 		$ref = $this->getNodeRef();
 
-		if (null !== $ref) {
-			return $ref->getUuid();
-		}
+		if (null === $ref) return;
+
+		return $ref->getUuid();
 	}
 
 	/**
@@ -80,7 +83,11 @@ class Node extends AbstractRepositoryEntity {
 	 */
 	public function getVersion()
 	{
-		return $this->version;
+		$ref = $this->getNodeRef();
+
+		if (null === $ref) return;
+
+		return $ref->getVersion();
 	}
 
 	/**
@@ -107,7 +114,7 @@ class Node extends AbstractRepositoryEntity {
 	 * Get a specific property
 	 *
 	 * @param $name
-	 * @return PropertyInterface|Property|MultiProperty|null
+	 * @return PropertyInterface|SingleValuePropertyInterface|MultiValuePropertyInterface|null
 	 */
 	public function getProperty($name)
 	{
@@ -126,8 +133,8 @@ class Node extends AbstractRepositoryEntity {
 
 		if (null == $property) return;
 
-		if ($property->isMultiValued()) {
-			throw new RuntimeException('Requesting single value on a multi-valued property: ' . $name);
+		if ($property instanceof MultiValuePropertyInterface) {
+			throw new InvalidPropertyException('Requesting single value on a multi-valued property');
 		}
 
 		return $property->getValue();
@@ -223,6 +230,16 @@ class Node extends AbstractRepositoryEntity {
 	public function save()
 	{
 		return $this->getRepository()->getNodeService()->save($this);
+	}
+
+	/**
+	 * Delete the node
+	 *
+	 * @return Node
+	 */
+	public function delete()
+	{
+		return $this->getRepository()->getNodeService()->delete($this);
 	}
 
 	/**

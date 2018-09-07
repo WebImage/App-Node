@@ -16,7 +16,7 @@ class Field
 	/**
 	 * Field constructor.
 	 *
-	 * @param $typeQName
+	 * @param string $typeQName
 	 * @param $field
 	 */
 	public function __construct($typeQName, $field)

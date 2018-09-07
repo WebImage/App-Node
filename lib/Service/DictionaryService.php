@@ -9,7 +9,6 @@ use WebImage\Node\Defs\DataTypeModelField;
 use WebImage\Node\Defs\NodeTypeDef;
 use WebImage\Node\Defs\NodeAssociationDef;
 use WebImage\Node\Defs\NodeTypeExtensionDef;
-use WebImage\Node\Service\QName;
 use WebImage\Node\Types\Type;
 
 //use WebImage\Node\Service\Db\NodeTypeDef;
@@ -23,6 +22,8 @@ use WebImage\Node\Types\Type;
 class DictionaryService implements RepositoryAwareInterface
 {
 	use RepositoryAwareTrait;
+
+	const DEFAULT_LOCAL_NAMESPACE = 'App';
 
 	private static $TYPE_STANDARD = 1;
 	private static $TYPE_EXTENSION = 2;
@@ -47,8 +48,14 @@ class DictionaryService implements RepositoryAwareInterface
 	 * @var Dictionary
 	 */
 	private $namespaces;
+	/**
+	 * The local namespace to use for types, e.g. "App" might result in a type namespace of App.Node.Type
+	 *
+	 * @var string
+	 */
+	private $localNamespace;
 
-	public function __construct()
+	public function __construct($localNamespace=null)
 	{
 		/**
 		 * Instantiate namespaces object
@@ -70,6 +77,10 @@ class DictionaryService implements RepositoryAwareInterface
 		 * Instatiate data type input elements
 		 */
 //		$this->inputElementDefs = new CWI_CNODE_DICTIONARY_InputElementDefDictionary();
+		/**
+		 * Override the default "App" namespace
+		 */
+		$this->localNamespace = $localNamespace;
 
 		$config_file = __DIR__ . '/../../config/dictionary.php';
 		$config = new Config(require($config_file));
@@ -83,11 +94,7 @@ class DictionaryService implements RepositoryAwareInterface
 	 */
 	public function getLocalNamespace()
 	{
-		return 'app';
-//		$namespace = ConfigurationManager::get('DOMAIN');
-//		if (empty($namespace)) $namespace = 'custom';
-//		else $namespace = 'http://' . $namespace;
-//		return $namespace;
+		return null === $this->localNamespace ? self::DEFAULT_LOCAL_NAMESPACE : $this->localNamespace;
 	}
 
 	/**
@@ -97,7 +104,6 @@ class DictionaryService implements RepositoryAwareInterface
 	 */
 	public function getLocalNamespaceByAppendingValue($value)
 	{
-//		$value = '/' . ltrim($value, '/');
 		$value = '.' . ltrim($value, '.');
 
 		return self::getLocalNamespace() . $value;
@@ -117,21 +123,6 @@ class DictionaryService implements RepositoryAwareInterface
 		$machine_name = preg_replace('#_{2,}#', '_', $machine_name); // Make sure that there is not more than one underscore in a row
 
 		return $machine_name;
-	}
-
-	/**
-	 * Create a QName from a local string
-	 *
-	 * @param $qnameStr
-	 *
-	 * @return QName
-	 */
-	private function getQNameFromLocalNameStr($qnameStr)
-	{ // cwi:base => {http://www.cwimage.com/model}content
-		list($namespace_prefix, $local_name) = explode(QName::NAMESPACE_PREFIX, $qnameStr);
-		$namespace_uri = $this->namespaces->get($namespace_prefix);
-
-		return QName::createQName($namespace_uri, $local_name);
 	}
 
 	/**
@@ -167,35 +158,21 @@ class DictionaryService implements RepositoryAwareInterface
 	{
 		$name = $type->get('name');
 		$friendly_name = $type->get('friendlyName');
-		$parent_str = $type->get('parent');
+		$parent = $type->get('parent');
 
 		// Make sure the object has a
 		if (empty($friendly_name)) $friendly_name = $name;
 
 		/**
-		 * Process QName
+		 * Process qname
 		 */
-		$qname_str = $type->get('qname');
+		$qname = $type->get('qname');
 
 		// If QName is still empty then we have a serious problem
-		if (empty($qname_str)) {
-			throw new Exception('Undefined QName');
+		if (empty($qname)) {
+			throw new Exception('Undefined qname');
 		}
 
-		$qname = self::getQNameFromLocalNameStr($qname_str);
-
-		/**
-		 * Process parent QName
-		 */
-		$parent = null;
-
-		if (!empty($parent_str)) {
-			list($namespace_prefix, $local_name) = explode(':', $parent_str);
-			$namespace_uri = $this->namespaces->get($namespace_prefix);
-			$parent = QName::createQName($namespace_uri, $local_name);
-		}
-
-		#$type_def = new NodeTypeDef();
 		$type_def = null;
 
 		if ($whichType == self::$TYPE_STANDARD) {
@@ -210,20 +187,17 @@ class DictionaryService implements RepositoryAwareInterface
 		$type_def->setQName($qname);
 
 		if (null !== $parent) {
-			$type_def->setParent($parent->toString());
+			$type_def->setParent($parent);
 		}
 
 		foreach($type->get('associations', []) as $association) {
-			$local_qname_str = $association->get('qname');
-			$association_qname = self::getQNameFromLocalNameStr($local_qname_str);
-			$type_def->addAssociation($association_qname->toString());
+			$association_qname = $association->get('qname');
+			$type_def->addAssociation($association_qname);
 		}
 
 		foreach($type->get('extensions', []) as $extension) {
-			$local_qname_str = $extension->get('name');
-
-			$extension_qname = self::getQNameFromLocalNameStr($local_qname_str);
-			$type_def->addExtension($extension_qname->toString());
+			$extension_qname = $extension->get('name');
+			$type_def->addExtension($extension_qname);
 		}
 
 
@@ -330,7 +304,7 @@ class DictionaryService implements RepositoryAwareInterface
 			$type_def = self::processTypeOrExtension(self::$TYPE_STANDARD, $type);
 			$type_def->isReadOnly(true); // Make sure that changes can't be made to these...
 			$type_def->isSubClassable($type->get('isSubClassable'));
-			$this->types->set($type_def->getQName()->toString(), $type_def);
+			$this->types->set($type_def->getQName(), $type_def);
 		}
 
 		/**
@@ -341,7 +315,7 @@ class DictionaryService implements RepositoryAwareInterface
 			$extension_def = self::processTypeOrExtension(self::$TYPE_EXTENSION, $extension);
 			$extension_def->isReadOnly(true); // Make sure that changes can't be made to these...
 			$extension_def->isSubClassable(false); // Extensions are not currently extendable
-			$this->types->set($extension_def->getQName()->toString(), $extension_def);
+			$this->types->set($extension_def->getQName(), $extension_def);
 		}
 
 		/**
@@ -461,7 +435,7 @@ class DictionaryService implements RepositoryAwareInterface
 
 	public function addType(NodeTypeDef $nodeTypeDef)
 	{
-		$this->types->set($nodeTypeDef->getQName()->toString(), $nodeTypeDef);
+		$this->types->set($nodeTypeDef->getQName(), $nodeTypeDef);
 	}
 
 	public function addAssociation($associationDef)
@@ -479,7 +453,7 @@ class DictionaryService implements RepositoryAwareInterface
 //	}
 	public function setType(NodeTypeDef $def)
 	{
-		$this->types->set($def->getQName()->toString(), $def);
+		$this->types->set($def->getQName(), $def);
 	}
 
 	public function setAssociation(NodeAssociationDef $def)

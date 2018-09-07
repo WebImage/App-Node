@@ -4,26 +4,16 @@ namespace WebImage\Node\Properties;
 
 use WebImage\Core\Dictionary;
 
-class MultiProperty extends Property
+class MultiValueProperty extends AbstractProperty implements MultiValuePropertyInterface
 {
 	/**
 	 * @property Dictionary[] $values a collection of dictionary objects that hold all possible facets of a value
 	 **/
 	private $values = [];
 
-	function __construct()
-	{
-		$this->resetValues();
-	}
-
-	public function isMultiValued()
-	{
-		return true;
-	}
 
 	/**
-	 * Return values
-	 * @return array
+	 * @inheritdoc
 	 */
 	public function getValues()
 	{
@@ -31,38 +21,35 @@ class MultiProperty extends Property
 	}
 
 	/**
-	 * Returns native storage vars
+	 * @inheritdoc
 	 */
-	public function getValueDictionary()
-	{
-		return array_map(function($value) {
-			return ImmutableDictionary($value);
-		}, $this->values);
-	}
-
 	public function setValues(array $values)
 	{
 		$this->values = [];
 
+		// Pass values to addValue(...) to enforce proper class typing
 		foreach ($values as $value) {
 			$this->addValue($value);
 		}
 	}
 
+	/**
+	 * @inheritdoc
+	 */
 	public function addValue($value)
 	{
-		if (is_object($value) && !($value instanceof Dictionary)) {
-			throw new Exception('Invalid type for setValue');
-//		} else if (is_string($value)) { // Convert to dictionary object
-//			$d = new Dictionary();
-//			$d->set('', $value);
-//			$value = $d;
+		if (is_object($value) && !($value instanceof SingleValuePropertyInterface)) {
+			throw new Exception(sprintf('%s was expecting a ', __METHOD__, SingleValuePropertyInterface::class));
+		} else if (is_string($value)) { // Convert to dictionary object
+			$v = new MultiValuePropertyValue();
+			$v->setValue($value);
+			$value = $v;
 		}
 
 		$this->values[] = $value;
 	}
 
-	public function resetValues() {
+	public function reset() {
 		$this->values = [];
 	}
 }

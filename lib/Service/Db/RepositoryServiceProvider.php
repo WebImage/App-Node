@@ -4,6 +4,7 @@ namespace WebImage\Node\Service\Db;
 
 use League\Container\Definition\ClassDefinition;
 use League\Container\ServiceProvider\AbstractServiceProvider;
+use WebImage\Application\ApplicationInterface;
 use WebImage\Db\Manager;
 use WebImage\Node\Service\DictionaryService;
 use WebImage\Node\Service\Repository;
@@ -20,6 +21,9 @@ class RepositoryServiceProvider extends AbstractServiceProvider
 		$container = $this->getContainer();
 
 		$container->share(RepositoryInterface::class, function() use ($container) {
+
+			/** @var ApplicationInterface $app */
+			$app = $container->get(ApplicationInterface::class);
 
 			/** @var Manager $connectionManager */
 			$connectionManager = $container->get(Manager::class);
@@ -45,7 +49,8 @@ class RepositoryServiceProvider extends AbstractServiceProvider
 			/**
 			 * Add dictionary
 			 */
-			$dictionary_service = new DictionaryService();
+			$localNamespace = $app->getConfig()->get('nodes.localNamespace');
+			$dictionary_service = new DictionaryService($localNamespace);
 			$dictionary_service->setRepository($repository);
 			$repository->setDictionaryService($dictionary_service);
 

@@ -2,7 +2,7 @@
 
 namespace WebImage\Node\Service\Db;
 
-use WebImage\Node\Types\Type;
+use WebImage\Node\DataTypes\Type;
 use Doctrine\DBAL\Types\Type as DoctrineType;
 
 class DoctrineTypeMap {

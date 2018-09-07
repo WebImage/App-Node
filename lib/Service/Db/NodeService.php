@@ -13,10 +13,15 @@ use WebImage\Node\Entities\NodeAssociation;
 use WebImage\Node\Entities\Node;
 use WebImage\Node\Entities\NodeRefInterface;
 use WebImage\Node\Entities\NodeType;
-use WebImage\Node\Properties\MultiProperty;
+use WebImage\Node\Properties\InvalidPropertyException;
+use WebImage\Node\Properties\MultiValueProperty;
+use WebImage\Node\Properties\MultiValuePropertyInterface;
 use WebImage\Node\Properties\Property;
 use WebImage\Node\Properties\PropertyInterface;
+use WebImage\Node\Properties\SingleValuePropertyInterface;
+use WebImage\Node\Query\Filter;
 use WebImage\Node\Query\Query;
+use WebImage\Node\Query\QueryBuilder;
 use WebImage\Node\Service\NodeServiceInterface;
 use WebImage\Node\Service\QName;
 use WebImage\Node\Service\RepositoryAwareTrait;
@@ -25,6 +30,9 @@ use WebImage\String\Uuid;
 class NodeService implements NodeServiceInterface
 {
 	use RepositoryAwareTrait;
+
+	const NODE_STATUS_ACTIVE = 'A';
+	const NODE_STATUS_DELETED = 'D';
 
 	/** @var Manager */
 	private $connectionManager;
@@ -101,7 +109,7 @@ class NodeService implements NodeServiceInterface
 			$qb = $this->getConnectionManager()->createQueryBuilder();
 
 			$data = [
-				'type_qname' => $nodeType->getDef()->getQName()->toString(),
+				'type_qname' => $nodeType->getDef()->getQName(),
 				'created' => $created,
 				'created_by' => $createdBy,
 				'uuid' => Uuid::v4(),
@@ -130,7 +138,7 @@ class NodeService implements NodeServiceInterface
 			if (!($type->getDef() instanceof NodeTypeRef)) continue;
 
 			$typeDef = $type->getDef();
-			$typeQName = $typeDef->getQName()->toString();
+			$typeQName = $typeDef->getQName();
 			$tableKey = $typeDef->getTableKey();
 			$properties = $typeDef->getProperties();
 
@@ -170,10 +178,10 @@ class NodeService implements NodeServiceInterface
 
 				// Otherwise add it to the list of values to update
 				} else {
-					/** @var Property|MultiProperty $property */
+					/** @var Property|MultiValueProperty $property */
 					$property = $node->getProperty($fieldName);
 
-					$propertyType = $propertyDef->getType();
+					$propertyType = $propertyDef->getQName();
 
 					$dataType = $this->getRepository()->getDataTypeService()->getDataType($propertyType);
 					if (null === $dataType) {
@@ -302,7 +310,7 @@ die(__FILE__.':'.__LINE__.PHP_EOL);
 								$columns = array();
 								foreach ($test as $column => $value) {
 									if (substr($column, 0, 1) != '_') {
-										array_push($columns, "`" . $column . "` = '" . $dao_property->safeString($value) . "'");
+										$columns[] = "`" . $column . "` = '" . $dao_property->safeString($value) . "'";
 									}
 								}
 
@@ -333,12 +341,10 @@ die(__FILE__.':'.__LINE__.PHP_EOL);
 								$compositeFieldName = $fieldName . '_' . $dataTypeModelField->getName();
 
 								$typeData[$compositeFieldName] = $complexPropertyValue->get($dataTypeModelField->getName());
-
 							}
 						}
 					}
 				}
-
 			}
 
 			// Check if this is a new record so that we can create it if necessary
@@ -398,6 +404,22 @@ die(__FILE__.':'.__LINE__.PHP_EOL);
 
 		return $node;
 	}
+
+	/**
+	 * @inheritdoc
+	 */
+	public function delete(Node $node)
+	{
+		$qb = $this->getConnectionManager()->createQueryBuilder();
+
+		$qb->update('nodes')
+			->set('status', ':status')
+			->where('uuid = :uuid')
+			->setParameter(':status', self::NODE_STATUS_DELETED)
+			->setParameter(':uuid', $node->getNodeRef()->getUuid())
+			->execute();
+	}
+
 	private function _getNodeIdValue($node)
 	{
 		return $node->getNodeRef()->getNodeId();
@@ -452,12 +474,11 @@ die(__FILE__.':'.__LINE__.PHP_EOL);
 	/**
 	 * @inheritdoc
 	 */
-	public function create($qnameStr)
+	public function create($qname)
 	{
-		$qname = QName::createQName($qnameStr);
-		$nodeType = $this->getRepository()->getNodeTypeService()->getNodeTypeByTypeQName($qname->toString());
-		if (null === $nodeType) throw new Exception('Unable to locate type ' . $qname->toString());
-		$node = new Node($qname->toString());
+		$nodeType = $this->getRepository()->getNodeTypeService()->getNodeTypeByTypeQName($qname);
+		if (null === $nodeType) throw new Exception('Unable to locate type ' . $qname);
+		$node = new Node($qname);
 		$node->setRepository($this->getRepository());
 
 		$types = $nodeType->getParents();
@@ -476,7 +497,7 @@ die(__FILE__.':'.__LINE__.PHP_EOL);
 			foreach($properties as $fieldName => $def) {
 
 				if ($def->isMultiValued()) {
-					$node_property = new MultiProperty();
+					$node_property = new MultiValueProperty();
 					if (null !== $def->getDefault()) $node_property->addValue($def->getDefault());
 				} else {
 					$node_property = new Property();
@@ -509,8 +530,9 @@ die(__FILE__.':'.__LINE__.PHP_EOL);
 
 		$nodesData = $qb->select('*')
 			->from('nodes')
-			->where('uuid IN (:uuid)')
+			->where('uuid IN (:uuid) AND status = :status')
 			->setParameter(':uuid', $uuids, Connection::PARAM_STR_ARRAY)
+			->setParameter(':status', self::NODE_STATUS_ACTIVE)
 			->execute()
 			->fetchAll();
 
@@ -532,7 +554,7 @@ die(__FILE__.':'.__LINE__.PHP_EOL);
 			if (count($typeStack) == 0) continue;
 
 			/** @var Nodetype $type */
-			$typeQName = $nodeType->getDef()->getQName()->toString();
+			$typeQName = $nodeType->getDef()->getQName();
 
 			if (!$allTypeQNames->has($typeQName)) {
 				$allTypeQNames->set($typeQName, $typeStack);
@@ -620,7 +642,7 @@ die(__FILE__.':'.__LINE__.PHP_EOL);
 					/** @var Node $node */
 					$node = $nodes->get($uuid);
 					$propertyKey = $propertyDef->getKey();
-					/** @var MultiProperty $property */
+					/** @var MultiValueProperty $property */
 					$property = $node->getProperty($propertyKey);
 
 					if ($dataType->isSimpleStorage()) {
@@ -647,7 +669,7 @@ die(__FILE__.':'.__LINE__.PHP_EOL);
 	 */
 	private function addSimpleNodeProperties(Dictionary $nodes, Dictionary $nodeUuidLookup, array $typeStack)
 	{
-		$nodeIds = $this->extractNodeIdsForPrimaryType($nodes, $typeStack[0]->getDef()->getQName()->toString());
+		$nodeIds = $this->extractNodeIdsForPrimaryType($nodes, $typeStack[0]->getDef()->getQName());
 
 		$results = $this->getNodeDataResultsForTypes($nodeIds, $typeStack);
 
@@ -669,13 +691,13 @@ die(__FILE__.':'.__LINE__.PHP_EOL);
 
 					if ($propertyDef->isMultiValued()) {
 
-						$property = new MultiProperty();
+						$property = new MultiValueProperty();
 						$property->setDef($propertyDef);
 						$node->addProperty($propertyDef->getKey(), $property);
 
 					} else {
 
-						$dataType = $this->getRepository()->getDataTypeService()->getDataType($propertyDef->getType());
+						$dataType = $this->getRepository()->getDataTypeService()->getDataType($propertyDef->getQName());
 
 						$resultKey = sprintf('%s__%s', $typeDef->getTableKey(), $propertyDef->getKey());
 
@@ -771,6 +793,7 @@ die(__FILE__.':'.__LINE__.PHP_EOL);
 	private function getNodeDataResultsForTypes(array $nodeIds, array $typeStack)
 	{
 		$qb = $this->getConnectionManager()->createQueryBuilder();
+		$anyProps = false;
 
 		/**
 		 * Build primary type query
@@ -783,6 +806,7 @@ die(__FILE__.':'.__LINE__.PHP_EOL);
 			$typeDef = $type->getDef();
 
 			$props = $typeDef->getProperties();
+			if (count($props) > 0) $anyProps = true;
 
 			if ($typeDef instanceof NodeTypeRef) {
 				if ($ix == 0) {
@@ -802,7 +826,7 @@ die(__FILE__.':'.__LINE__.PHP_EOL);
 				foreach ($props as $propertyDef) {
 					if ($propertyDef->isMultiValued()) continue;
 
-					$propDataType = $this->getRepository()->getDictionaryService()->getDataType($propertyDef->getType());
+					$propDataType = $this->getRepository()->getDictionaryService()->getDataType($propertyDef->getQName());
 					$modelFields = $propDataType->getModelFields();
 					/** @var DataTypeModelField $modelField */
 					foreach ($modelFields as $modelField) {
@@ -814,7 +838,7 @@ die(__FILE__.':'.__LINE__.PHP_EOL);
 			}
 		}
 
-		return $qb->execute()->fetchAll();
+		return $anyProps ? $qb->execute()->fetchAll() : [];
 	}
 
 	/**
@@ -836,122 +860,7 @@ die(__FILE__.':'.__LINE__.PHP_EOL);
 		return $nodes->get($uuid);
 	}
 
-	/**
-	 * @return array a keyed array, one value for 'tables' and one for 'properties'
-	 */
-	private function getPropertyDefsForTypeQName(array $objects, array $tables)
-	{
 
-		static $lookup_cache;
-		static $total_time = 0;
-
-		$time0 = FrameworkManager::getTime();
-
-		if (null === $lookup_cache) $lookup_cache = new Dictionary();
-
-		$properties_info = array();
-		$columns_info = array();
-
-		foreach ($objects as $object) {
-
-			$object_type_qname = $object->getTypeQName();
-			$object_field_name = $object->getField();
-
-			$use_type_defs = array();
-
-			// If this value is null then assume we are dealing with a wildcard requested where we want to grab all instances of a field across all NodeType's
-
-			if (null === $object_type_qname) {
-
-				$all_node_types = $this->getRepository()->getNodeTypeService()->getNodeTypes();
-
-				while ($nodeType = $all_node_types->getNext()) {
-
-					$nodeTypeDef = $nodeType->getDef();
-
-					// Check if property exists in this node type
-					if ($property = $nodeTypeDef->getProperty($object_field_name)) {
-						array_push($use_type_defs, $nodeTypeDef);
-					}
-				}
-
-				//Otherwise, assume a specific type is being referenced for the field inclusion
-			} else {
-
-				if ($nodeType = $this->getRepository()->getNodeTypeService()->getNodeTypeByTypeQName($object_type_qname)) {
-					$nodeTypeDef = $nodeType->getDef();
-					array_push($use_type_defs, $nodeTypeDef);
-				}
-			}
-
-			// Iterate through each of the found type_defs (there will be multiple if $object_type_qname is null, and one if $object_type_qname is defined
-			foreach ($use_type_defs as $use_type_def) {
-
-				if (is_a($use_type_def, 'NodeTypeDef')) {
-
-					$tableKey = $use_type_def->getTableKey();
-
-					// Make sure that the table is included in our listed of queriable tables
-					if ($tableKey != 'nodes' && !in_array($tableKey, $tables)) {
-						array_push($tables, $tableKey);
-					}
-
-					// Make sure field is actually part of the type in question
-					if ($propertyDef = $use_type_def->getProperty($object_field_name)) {
-						// Only handle single value properties for now
-
-						if (!$propertyDef->isMultiValued()) {
-
-							$columns = array();
-
-							if ($dataType = $this->getRepository()->getDataTypeService()->getDataType($propertyDef->getType())) {
-
-								if ($dataType->isSimpleStorage()) {
-
-									array_push($columns_info, $propertyDef->getKey());
-									array_push($columns, $propertyDef->getKey());
-
-								} else {
-
-									$model_fields = $dataType->getModelFields();
-
-									while ($model_field = $model_fields->getNext()) {
-
-										$field_name = $propertyDef->getKey() . '_' . $model_field->getName();
-
-										array_push($columns_info, array(
-											'table_key' => $tableKey,
-											'object' => $object,
-											'field_name' => $field_name
-										));
-										array_push($columns, $field_name);
-
-									}
-
-								}
-
-							}
-
-							$property_info = array(
-								'table_key' => $tableKey,
-								'property_def' => $propertyDef,
-								'object' => $object,
-								'columns' => $columns
-							);
-
-							array_push($properties_info, $property_info);
-						}
-					}
-				}
-			}
-		}
-
-		return array(
-			'tables' => $tables,
-			'properties_info' => $properties_info,
-			'columns_info' => $columns_info
-		);
-	}
 
 	/**
 	 * Create a NodeAssociationDef
@@ -964,7 +873,7 @@ die(__FILE__.':'.__LINE__.PHP_EOL);
 			$key = 'assoc-' . $this->getRepository()->getDictionaryService()->createKeyFromFriendlyName($friendlyName);
 
 			$qname = QName::createQName($namespace, $key);
-			$assocTypeQName = $qname->toString();
+			$assocTypeQName = $qname;
 		}
 
 		// Create the database entry
@@ -1086,422 +995,22 @@ die(__FILE__.':'.__LINE__.PHP_EOL);
 		return $return;
 	}
 
+	/**
+	 * @inheritdoc
+	 */
 	public function query(Query $query)
 	{
-		$query_fields = $query->getFields();
-		$query_filters = $query->getFilters();
-		$query_filter_type_qnames = $query->getFilterTypeQNames();
-		$query_sorts = $query->getSorts();
-		$query_keywords = $query->getKeywords();
-
-		$fields = array();
-		$filters = array();
-		$sorts = array();
-		$keywords = array();
-
-		$typeQNames = array();
-		$tables = array('node_base');
-		$inner_join_tables = array('node_base');
-
-		/**
-		 * Add fields
-		 */
-		$info = $this->getPropertyDefsForTypeQName($query_fields, $tables);
-
-		$tables = $info['tables']; // Updates tables
-		$properties_info = $info['properties_info'];
-		foreach ($properties_info as $property_info) {
-
-			$tableKey = $property_info['table_key'];
-			$object = $property_info['object'];
-
-			if (!isset($fields[$tableKey])) $fields[$tableKey] = array();
-
-			#array_push($fields[$tableKey], $object->getField());
-			foreach ($property_info['columns'] as $column) {
-
-				array_push($fields[$tableKey], $column);
-
-			}
-		}
-
-		/*
-		 * Generate keywords
-		 */
-		$filter_keywords = array();
-
-		if (count($query_keywords) > 0) {
-
-			// Get all available NodeTypes
-			$nodeTypes = $this->getRepository()->getNodeTypeService()->getNodeTypes();
-			// Iterate through NodeTypes
-			while ($nodeType = $nodeTypes->getNext()) {
-				// Retrieve list of NodeTypeProperties for the current definition
-				$node_properties = $nodeType->getDef()->getProperties()->getAll();
-				// Iterate through properties
-				while ($node_property = $node_properties->getNext()) {
-
-					// Get property definition
-					$node_property_def = $node_property->getDef();
-					// Check if property is searchable
-					if ($node_property_def->isSearchable()) {
-						// Add search fields for all keywords
-						foreach ($query_keywords as $query_keyword) {
-							$filter_keywords[] = new CWI_CNODE_QUERY_Filter($nodeType->getDef()->getQName()->toString(), $node_property_def->getKey(), $query_keyword, 'LIKE');
-						}
-					}
-				}
-			}
-		}
-
-		$info = $this->getPropertyDefsForTypeQName($filter_keywords, $tables);
-
-		$tables = $info['tables'];
-		$properties_info = $info['properties_info'];
-		foreach ($properties_info as $property_info) {
-
-			$tableKey = $property_info['table_key'];
-			$object = $property_info['object'];
-			$field_name = $object->getField();
-			$field_value = $object->getValue();
-
-			if (!isset($keywords[$tableKey])) $keywords[$tableKey] = array();
-			if (!isset($keywords[$tableKey][$field_name])) $keywords[$tableKey][$field_name] = array();
-
-			array_push($keywords[$tableKey][$field_name], $field_value);
-		}
-
-
-		/**
-		 * Add filters
-		 */
-
-		$info = $this->getPropertyDefsForTypeQName($query_filters, $tables);
-
-		$tables = $info['tables']; // Updates tables
-		$properties_info = $info['properties_info'];
-
-		foreach ($properties_info as $property_info) {
-
-			$tableKey = $property_info['table_key'];
-			$object = $property_info['object'];
-
-			$filter = array(
-				'query_filter' => $object,
-				'table_key' => $tableKey
-			);
-			array_push($filters, $filter);
-
-		}
-
-		/**
-		 * Add sorts
-		 */
-		$info = $this->getPropertyDefsForTypeQName($query_sorts, $tables);
-		$tables = $info['tables']; // Updates tables
-		$properties_info = $info['properties_info'];
-
-		foreach ($properties_info as $property_info) {
-
-			$tableKey = $property_info['table_key'];
-			$object = $property_info['object'];
-
-			$sort = array(
-				'query_sort' => $object,
-				'table_key' => $tableKey
-			);
-			array_push($sorts, $sort);
-		}
-
-		// DAO Search
-		$search = new DAOSearch('nodes');
-
-		foreach ($tables as $tableKey) {
-			$join_keys = array(
-				$tableKey . '.node_id' => 'nodes.node_id',
-				$tableKey . '.version' => 'nodes.version'
-			);
-			$select_fields = array();
-			if (isset($fields[$tableKey])) $select_fields = $fields[$tableKey];
-
-			$join_type = DAOJoin::JOIN_LEFT;
-			if (in_array($tableKey, $inner_join_tables)) $join_type = DAOJoin::JOIN_INNER;
-
-			$join = new DAOJoin($tableKey, $join_type, $join_keys, $select_fields);
-			$search->addJoin($join);
-		}
-		$association_values = $query->getFilterAssociationValues();
-		for ($i = 0, $j = count($association_values); $i < $j; $i++) {
-
-			// Setup join for related tables
-			$tableKey = 'node_assocs';
-			$table_alias = 'node_assocs_' . $i;
-
-			$join_keys = array(
-				$table_alias . '.src_node_id' => 'nodes.node_id',
-				$table_alias . '.src_node_version' => 'nodes.version'
-			);
-			$join_type = DAOJoin::JOIN_INNER;
-			$join = new DAOJoin(array($tableKey, $table_alias), $join_type, $join_keys);
-
-			$search->addJoin($join);
-
-			// Setup where clause for association
-
-			$association_value = $association_values[$i]->getValue();
-			$association_type_qname = $association_values[$i]->getAssociationTypeQName();
-
-			if (is_array($association_value)) { // Search for multiple values using an array of possible vlaues
-
-				$value_search_field = new DAOSearchFieldValues($table_alias, 'dst_node_id', $association_value);
-
-				// Since we are search multiple values, we should make sure that only distince Nodes are returned (since a Node could potentially match more than one associations and create duplicate results
-				$search->makeDistinct(true);
-
-			} else {
-				$value_search_field = new DAOSearchField($table_alias, 'dst_node_id', $association_value);
-			}
-
-			$search->addSearchField($value_search_field);
-
-			// Filter by association type qname, but only if a value is actually defined (otherwise it would be considered a "wildcard" search for any type of association with another node
-			if (!empty($association_type_qname)) {
-
-				$search->addSearchField(new DAOSearchField($table_alias, 'assoc_type_qname', $association_type_qname));
-
-			}
-			#getAssociationTypeQName()
-			#getValue()
-#$group->addSearchField( new DAOSearchField('nodes', 'type_qname', $query_filter_type_qname) );
-		}
-
-		foreach ($filters as $filter) {
-			$tableKey = $filter['table_key'];
-			$query_filter = $filter['query_filter'];
-			$field = $query_filter->getField();
-			$value = $query_filter->getValue();
-			$operator = strtoupper($query_filter->getOperator());
-
-			$search_field = null;
-
-			switch ($operator) {
-				case 'LIKE':
-					$search_field = new DAOSearchFieldWildcard($tableKey, $field, $value);
-					break;
-				case '!=':
-					$search_field = new DAOSearchFieldNot($tableKey, $field, $value);
-					break;
-				case '=':
-				default:
-					$search_field = new DAOSearchField($tableKey, $field, $value);
-					break;
-			}
-
-			if (null !== $search_field) $search->addSearchField($search_field);
-
-		}
-
-		// Add keywords to search
-
-		if (count($keywords) > 0) {
-
-			// Build list of searchable fields
-
-			$keyword_group = new DAOSearchOrGroup();
-
-			foreach ($keywords as $tableKey => $fields) {
-
-				foreach ($fields as $name => $values) {
-
-					foreach ($values as $value) {
-
-						$keyword_group->addSearchField(new DAOSearchFieldWildcard($tableKey, $name, $value));
-
-					}
-				}
-			}
-
-			$search->addSearchField($keyword_group);
-		}
-
-		// Filter search by type_names (e.g. {http://www.cwimage.com/model/core}content)
-		if (count($query_filter_type_qnames) > 0) {
-
-			$group = new DAOSearchOrGroup();
-
-			foreach ($query_filter_type_qnames as $query_filter_type_qname) {
-
-				$group->addSearchField(new DAOSearchField('nodes', 'type_qname', $query_filter_type_qname));
-
-			}
-
-			$search->addSearchField($group);
-		}
-
-
-		foreach ($sorts as $sort) {
-
-			$query_filter = $sort['query_sort'];
-			$sort_direction = null;
-
-			if ($query_filter->getSortDirection() == CWI_CNODE_QUERY_Query::SORT_ASC) {
-
-				$sort_direction = DAOSearch::SORT_ASC;
-
-			} else if ($query_filter->getSortDirection() == CWI_CNODE_QUERY_Query::SORT_DESC) {
-
-				$sort_direction = DAOSearch::SORT_DESC;
-
-			}
-
-			$search->addSort($sort['table_key'], $sort['query_sort']->getField(), $sort_direction);
-
-		}
-
-		$dao = new DataAccessObject();
-		$dao->separateResultTables(true);
-
-		// Check if we need to paginate results:
-		$current_page = $query->getCurrentPage();
-		$results_per_page = $query->getResultsPerPage();
-
-		if (!empty($current_page) && !empty($results_per_page)) $dao->paginate($current_page, $results_per_page);
-
-		$results = $dao->search($search);
-
-		$rs_return_nodes = new ResultSet();
-		$rs_return_nodes->setTotalResults($results->getTotalResults());
-		$rs_return_nodes->setCurrentPage($results->getCurrentPage());
-		$rs_return_nodes->setResultsPerPage($results->getResultsPerPage());
-
-
-		while ($result = $results->getNext()) {
-
-			$typeQName = $result->nodes->type_qname;
-			$node = new CWI_CNODE_SERVICE_Node($typeQName);
-			$node->setRepository($this->getRepository());
-
-			$nodeRef = new NodeRef($result->nodes->uuid, $result->nodes->version, $result->nodes->node_id);
-			$node->setNodeRef($nodeRef);
-
-			if ($type = $this->getRepository()->getNodeTypeService()->getNodeTypeByTypeQName($typeQName)) {
-
-				$typeStack = $type->getTypeStack();
-
-				foreach ($typeStack as $stack_type) {
-
-					$typeDef = $stack_type->getDef();
-
-					$propertyDefs = $typeDef->getProperties()->getAll();
-
-					while ($prop = $propertyDefs->getNext()) {
-
-						$propertyDef = $prop->getDef();
-						$propertyTableKey = null; // Defined below
-						$property_key = $propertyDef->getKey();
-
-						$propertyDataType = $this->getRepository()->getDataTypeService()->getDataType($prop->getDef()->getType());
-
-						/**
-						 * Get Property Definition Original Table
-						 */
-						$propertyDefTypeQName = $propertyDef->getNodeTypeTypeQName();
-
-						if ($propertyDef_type = $this->getRepository()->getNodeTypeService()->getNodeTypeByTypeQName($propertyDefTypeQName)) {
-
-							$propertyDef_type_def = $propertyDef_type->getDef();
-
-							// Make sure this is a database definition, because we need the getTableKey() method
-							if (is_a($propertyDef_type_def, 'INodeTypeDef')) {
-
-								$propertyTableKey = $propertyDef_type_def->getTableKey();
-
-								/**
-								 * Make sure that the table to which this node type's date should be pulled from is available
-								 */
-
-								if (isset($result->$propertyTableKey)) {
-
-									// The object for this particular table
-									$result_table = $result->$propertyTableKey;
-
-									$result_table_keys = get_object_vars($result_table);
-
-
-									$fields = array();
-
-									if ($propertyDataType->isSimpleStorage()) {
-
-										if (array_key_exists($property_key, $result_table_keys)) {
-
-											$node_property = null;
-
-											if ($propertyDef->isMultiValued()) {
-												$node_property = new CWI_CNODE_NodeMultiProperty();
-												#if ($default_value = $def->getDefault()) $node_property->addValue($node_property->setValue($def->getDefault()));
-											} else {
-												$node_property = new CWI_CNODE_NodeProperty();
-												$node_property->setValue($result_table->$property_key);
-											}
-											$node_property->setDef($propertyDef);
-											$node->addProperty($property_key, $node_property);
-
-										} /* else: What should we do if a properties value is not available in the query results.... */
-										else {
-											#echo 'Missing: ' . $propertyTableKey . '-> ' . $property_key . '<br />';
-										}
-
-									} else {
-
-										$fields = array();
-
-										$dataTypeModelFields = $propertyDataType->getModelFields();
-
-										$d = new Dictionary();
-
-										while ($dataTypeModelField = $dataTypeModelFields->getNext()) {
-
-											$field_name = $property_key . '_' . $dataTypeModelField->getName();
-
-											if (array_key_exists($field_name, $result_table_keys)) {
-
-												$d->set($dataTypeModelField->getName(), $result_table->$field_name);
-
-											}
-
-										}
-
-										if ($propertyDef->isMultiValued()) {
-
-											$node_property = new CWI_CNODE_NodeMultiProperty();
-											#if ($default_value = $def->getDefault()) $node_property->addValue($node_property->setValue($def->getDefault()));
-
-										} else {
-
-											$node_property = new CWI_CNODE_NodeProperty();
-											$node_property->setValue($d);
-
-										}
-
-										$node_property->setDef($propertyDef);
-										$node->addProperty($property_key, $node_property);
-
-									}
-
-
-								} /* else: What should we do if the table is not found in the results */
-							}
-
-						} /* else: could not find the qname for the property */
-					}
-				}
-			}
-
-			$rs_return_nodes->add($node);
-
-		}
-
-		return $rs_return_nodes;
+		$queryService = new NodeQueryService($this);
+
+		return $queryService->query($query);
+	}
+
+	/**
+	 * @inheritdoc
+	 */
+	public function createQueryBuilder()
+	{
+		return new QueryBuilder($this);
 	}
 
 	/**

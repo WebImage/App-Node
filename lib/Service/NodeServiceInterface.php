@@ -7,6 +7,7 @@ use WebImage\Node\Entities\Node;
 use WebImage\Node\Entities\NodeAssociation;
 use WebImage\Node\Entities\NodeRefInterface;
 use WebImage\Node\Query\Query;
+use WebImage\Node\Query\QueryBuilder;
 
 interface NodeServiceInterface extends RepositoryAwareInterface
 {
@@ -44,6 +45,14 @@ interface NodeServiceInterface extends RepositoryAwareInterface
 	public function save(Node $node);
 
 	/**
+	 * Delete a node
+	 *
+	 * @param Node $node
+	 * @return
+	 */
+	public function delete(Node $node);
+
+	/**
 	 * Save a node reference
 	 *
 	 * @param string $typeQName
@@ -66,9 +75,17 @@ interface NodeServiceInterface extends RepositoryAwareInterface
 	 * Query nodes
 	 *
 	 * @param Query $query
-	 * @return mixed
+	 *
+	 * @return Node[]
 	 */
 	public function query(Query $query);
+
+	/**
+	 * Create query builder
+	 *
+	 * @return QueryBuilder
+	 */
+	public function createQueryBuilder();
 
 	/**
 	 * Set the repository
@@ -83,7 +100,7 @@ interface NodeServiceInterface extends RepositoryAwareInterface
 	/**
 	 * Create a node association
 	 *
-	 * @param $assocTypeQName
+	 * @param string $assocTypeQName
 	 * @param Node $srcNode
 	 * @param Node $dstNode
 	 *

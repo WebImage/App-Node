@@ -32,7 +32,7 @@ class Query
 	 */
 	private $keywords;
 	/**
-	 * @var int
+	 * @var int|null
 	 */
 	private $currentPage;
 	/**
@@ -112,7 +112,7 @@ class Query
 	/**
 	 * Get the current page
 	 *
-	 * @return int
+	 * @return int|null
 	 */
 	public function getCurrentPage()
 	{

@@ -11,6 +11,7 @@ use WebImage\Node\Entities\NodeType;
  * An interface for a NodeTypeService
  */
 interface NodeTypeServiceInterface extends RepositoryAwareInterface {
+	/** @return NodeType[] */
 	public function getNodeTypes();
 
 	/**
@@ -45,7 +46,15 @@ interface NodeTypeServiceInterface extends RepositoryAwareInterface {
 	 */
 	public function save(NodeType $type);
 
+	/**
+	 * Delete NodeType
+	 *
+	 * @param NodeType $type
+	 */
+	public function delete(NodeType $type);
+
 	public function createAssociation($friendlyName, $assocTypeQName, $primaryType, $associatedType);
+
 	public function saveAssociation(Association $association);
 
 //	public function createNodeTypePropertyDef($qname_str, $key, $name, $type, $required, $default, $is_multi_valued, $sortorder, $config);

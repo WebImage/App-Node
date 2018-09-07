@@ -2,17 +2,13 @@
 
 namespace WebImage\Node\Properties;
 
+use WebImage\Node\Defs\NodeTypePropertyDef;
+
 interface PropertyInterface {
-	/**
-	 * Whether a property has multiple values
-	 *
-	 * @return bool
-	 */
-	public function isMultiValued();
 	/**
 	 * Get the definition for an entity
 	 *
-	 * @return mixed
+	 * @return NodeTypePropertyDef
 	 */
 	public function getDef();
 
@@ -22,4 +18,9 @@ interface PropertyInterface {
 	 * @param $def
 	 */
 	public function setDef($def);
+
+	/**
+	 * Reset the property value to its original state
+	 */
+	public function reset();
 }
