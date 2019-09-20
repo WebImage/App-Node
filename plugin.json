@@ -1,11 +1,16 @@
 {
-  "id": "com.webimage.Node",
+  "id": "webimage/node",
   "name": "Node Manager",
+  "description": "An easy way to create dynamically typed content",
   "version": "1.0.0",
-  "namespace": "WebImage\\Node",
+  "author": {
+    "name": "Robert Jones II",
+    "email": "rjones@corporatewebimage.com",
+    "website": "https://www.corporatewebimage.com"
+  },
   "requirements": {
-    "plugins": [
-      "com.webimage.Form"
-    ]
+    "plugins": {
+      "webimage/form": "1"
+    }
   }
 }

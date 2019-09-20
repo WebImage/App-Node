@@ -3,18 +3,18 @@ use WebImage\Node\DataTypes\Type;
 return [
 	'types' => [
 		[
-			'qname' => 'WebImage.Node.Types.Root',
+			'qname' => 'WebImage.Types.Root',
 			'model' => ['name' => 'nodes', 'dataSaver' => 'CWI_CNODE_Root']
 		],
 		[
-			'qname' => 'WebImage.Node.Types.Type',
+			'qname' => 'WebImage.Types.Type',
 			'model' => ['name' => 'node_types']
 		],
 		[
 			'isSubClassable' => true,
 //			'parent' => 'cwi:Root',
-			'qname' => 'WebImage.Node.Types.Base',
-			'parent' => 'WebImage.Node.Types.Root',
+			'qname' => 'WebImage.Types.Base',
+			'parent' => 'WebImage.Types.Root',
 			'friendlyName' => 'Title',
 			'model' => ['name' => 'node_base'],
 			'properties' => [
@@ -25,31 +25,32 @@ return [
 		],
 		[
 			'isSubClassable' => true,
-			'qname' => 'WebImage.Node.Types.Content',
-			'parent' => 'WebImage.Node.Types.Base',
+			'qname' => 'WebImage.Types.Content',
+			'parent' => 'WebImage.Types.Base',
 			'model' => ['name' => 'node_content'],
 			'friendlyName' => 'Content',
 			'enableLocales' => false,
 			'enableProfiles' => false,
 			'extensions' => [
-				['name' => 'WebImage.Node.Types.OwnableExtension']
+				['name' => 'WebImage.Types.OwnableExtension']
 			],
 			'properties' => [
 				['name' => 'body', 'friendlyName' => 'Body', 'searchable' => true]
 			]
-		]
+		],
+
 	],
 	'extensions' => [
-		['qname' => 'WebImage.Node.Types.OwnableExtension', 'model' => ['name' => 'node_publishable']],
-		['qname' => 'WebImage.Node.Types.AuthorableExtension', 'associations' => [
+		['qname' => 'WebImage.Types.OwnableExtension', 'model' => ['name' => 'node_publishable']],
+		['qname' => 'WebImage.Types.AuthorableExtension', 'associations' => [
 			[
-				'qname' => 'WebImage.Node.Types.AuthorExtension',
+				'qname' => 'WebImage.Types.AuthorExtension',
 				'source' => [
 					'mandatory' => false,
 					'many' => true
 				],
 				'target' => [
-					'class' => 'WebImage.Node.Types.Base',
+					'class' => 'WebImage.Types.Base',
 					'mandatory' => true,
 					'many' => true
 				]
@@ -57,30 +58,30 @@ return [
 		]]
 	],
 	'dataTypes' => [
-		['type' => 'WebImage.Node.DataTypes.String', 'name' => 'Single Line', 'defaultInputElementClass' => 'TextInputElement', 'phpType' => 'string', 'modelField' => ['type' => Type::STRING, 'options' => ['length' => 255]]],
-		['type' => 'WebImage.Node.DataTypes', 'name' => 'Multi Line', 'defaultInputElementClass' => 'WysiwygInputElement', 'phpType' => 'string', 'modelField' => ['type' => Type::TEXT]],
-		['type' => 'WebImage.Node.DataTypes.Integer', 'name' => 'Integer', 'defaultInputElementClass' => 'TextInputElement', 'phpType' => 'int', 'modelField' => ['type' => Type::INTEGER]],
-		['type' => 'WebImage.Node.DataTypes.Date', 'name' => 'Date', 'defaultInputElementClass' => 'TextInputElement', 'phpType' => 'string', 'modelField' => ['type' => Type::DATE]],
-		['type' => 'WebImage.Node.DataTypes.DateTime', 'name' => 'Date/Time', 'defaultInputElementClass' => 'TextInputElement', 'phpType' => 'string', 'modelField' => ['type' => Type::DATETIME]],
-		['type' => 'WebImage.Node.DataTypes.Boolean', 'name' => 'True/False', 'defaultInputElementClass' => 'TextInputElement', 'phpType' => 'boolean', 'modelField' => ['type' => Type::BOOLEAN]],
-//		['type' => 'WebImage.Node.DataTypes.QName', 'defaultInputElementClass' => 'TextInputElement', 'phpType' => 'string', 'modelField' => ['type' => Type::STRING, 'options' => ['length' => 255]]],
-		['type' => 'WebImage.Node.DataTypes.NodeRef', 'name' => 'Reference', 'defaultInputElementClass' => 'TextInputElement', 'modelField' => ['type' => Type::STRING, 'options' => ['length' => 255]]],
-		['type' => 'WebImage.Node.DataTypes.ChildAssocRef', 'name' => 'Child Association', 'defaultInputElementClass' => 'TextInputElement', 'modelField' => ['type' => Type::INTEGER]], //CWI_REPO_SERVICE_ChildAssociationRef'],
-		['type' => 'WebImage.Node.DataTypes.AssocRef', 'name' => 'Association Ref', 'defaultInputElementClass' => 'TextInputElement', 'phpClassName' => 'CWI_REPO_SERVICE_AssociationRef'],
-//		['type' => 'WebImage.Node.DataTypes.Category', 'name' => 'Category', 'defaultInputElementClass' => 'TextInputElement', 'phpType' => 'string'],
-		['type' => 'WebImage.Node.DataTypes.User', 'name' => 'User', 'defaultInputElementClass' => 'TextInputElement', 'modelField' => ['type' => Type::INTEGER]],
-		['type' => 'WebImage.Node.DataTypes.File', 'name' => 'File', 'defaultInputElementClass' => 'FileUploadElement', 'phpClassName' => 'CWI_CNODE_DATATYPE_File', 'modelField' => ['type' => Type::INTEGER]],
-		['type' => 'WebImage.Node.DataTypes.Embeddedmedia', 'name' => 'Embedded Media', 'defaultInputElementClass' => 'CWI_CNODE_FORMBUILDER_EmbeddedMediaElement', 'modelFields' => [
+		['type' => 'WebImage.DataTypes.String', 'name' => 'Single Line', 'formElement' => 'text', 'phpType' => 'string', 'modelField' => ['type' => Type::STRING, 'options' => ['length' => 255]]],
+		['type' => 'WebImage.DataTypes.Text', 'name' => 'Multi Line', 'formElement' => 'textarea', 'phpType' => 'string', 'modelField' => ['type' => Type::TEXT]],
+		['type' => 'WebImage.DataTypes.Integer', 'name' => 'Integer', 'formElement' => 'number', 'phpType' => 'int', 'modelField' => ['type' => Type::INTEGER]],
+		['type' => 'WebImage.DataTypes.Date', 'name' => 'Date', 'formElement' => 'date', 'phpType' => 'string', 'modelField' => ['type' => Type::DATE]],
+		['type' => 'WebImage.DataTypes.DateTime', 'name' => 'Date/Time', 'formElement' => 'datetime', 'phpType' => 'string', 'modelField' => ['type' => Type::DATETIME]],
+		['type' => 'WebImage.DataTypes.Boolean', 'name' => 'True/False', 'formElement' => 'toggle', 'phpType' => 'boolean', 'modelField' => ['type' => Type::BOOLEAN]],
+//		['type' => 'WebImage.DataTypes.QName', 'formElement' => 'text', 'phpType' => 'string', 'modelField' => ['type' => Type::STRING, 'options' => ['length' => 255]]],
+		['type' => 'WebImage.DataTypes.NodeRef', 'name' => 'Reference', 'formElement' => 'text', 'modelField' => ['type' => Type::STRING, 'options' => ['length' => 255]]],
+		['type' => 'WebImage.DataTypes.ChildAssocRef', 'name' => 'Child Association', 'formElement' => 'text', 'modelField' => ['type' => Type::INTEGER]], //CWI_REPO_SERVICE_ChildAssociationRef'],
+		['type' => 'WebImage.DataTypes.AssocRef', 'name' => 'Association Ref', 'formElement' => 'text', 'phpClassName' => 'CWI_REPO_SERVICE_AssociationRef'],
+//		['type' => 'WebImage.DataTypes.Category', 'name' => 'Category', 'formElement' => 'select', 'phpType' => 'string'],
+		['type' => 'WebImage.DataTypes.User', 'name' => 'User', 'formElement' => 'text', 'modelField' => ['type' => Type::INTEGER]],
+		['type' => 'WebImage.DataTypes.File', 'name' => 'File', 'formElement' => 'upload', 'phpClassName' => 'CWI_CNODE_DATATYPE_File', 'modelField' => ['type' => Type::INTEGER]],
+		['type' => 'WebImage.DataTypes.EmbeddedMedia', 'name' => 'Embedded Media', 'formElement' => 'text', 'modelFields' => [
 				['name' => 'embed', 'type' => Type::TEXT],
 				['name' => 'value', 'type' => Type::STRING, 'options' => ['length' => '255']],
 				['name' => 'provider', 'type' => Type::STRING, 'options' => ['length' => '255']],
 				['name' => 'data', 'type' => Type::TEXT]
 		]],
-		['type' => 'WebImage.Node.DataTypes.Link', 'name' => 'Link', 'defaultInputElementClass' => 'LinkInputElement', 'modelFields' => [
+		['type' => 'WebImage.DataTypes.Link', 'name' => 'Link', 'formElement' => 'link', 'modelFields' => [
 			['name' => 'url', 'type' => Type::STRING, 'options' => ['length' => '255']],
 			['name' => 'title', 'type' => Type::STRING, 'options' => ['length' => '255']]
 		]],
-		['type' => 'WebImage.Node.DataTypes.Address', 'name' => 'Address', 'defaultInputElementClass' => 'AddressInputElement', 'modelFields' => [
+		['type' => 'WebImage.DataTypes.Address', 'name' => 'Address', 'formElement' => 'address', 'modelFields' => [
 			['name' => 'street1', 'type' => Type::STRING, 'options' => ['length' => 200, 'notnull' => false]],
 			['name' => 'street2', 'type' => Type::STRING, 'options' => ['length' => 255, 'notnull' => false]],
 			['name' => 'city', 'type' => Type::STRING, 'options' => ['length' => 200, 'notnull' => false]],
