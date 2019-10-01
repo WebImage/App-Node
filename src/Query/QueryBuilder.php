@@ -19,7 +19,6 @@ class QueryBuilder
 	/** @var Query */
 	private $query;
 
-
 	public function __construct(NodeServiceInterface $nodeService)
 	{
 		$this->nodeService = $nodeService;
@@ -93,6 +92,52 @@ class QueryBuilder
 		return $this;
 	}
 
+	public function where($property, $value, $operator=Filter::OPERATOR_EQUALS)
+	{
+		$this->query->addFilter(new Filter($property, $value, $operator));
+
+		return $this;
+	}
+
+	public function sort(string $field, string $sortDirection=Query::SORT_ASC)
+	{
+		if (!in_array($sortDirection, [Query::SORT_ASC, Query::SORT_DESC])) throw new \InvalidArgumentException('Expecting ' . Query::SORT_ASC . ' or ' . Query::SORT_DESC . ' for sort');
+
+		$this->query->addSort(new Sort($field, $sortDirection));
+
+		return $this;
+	}
+
+	/**
+	 * Set the current page number
+	 * @param int $pageNum
+	 */
+	public function page(int $pageNum)
+	{
+		$this->query->setCurrentPage($pageNum);
+
+		return $this;
+	}
+
+	/**
+	 * Set the number of results to return per page
+	 * @param int $rpp
+	 */
+	public function resultsPerPage(int $rpp)
+	{
+		$this->query->setResultsPerPage($rpp);
+
+		return $this;
+	}
+
+	/**
+	 * @return Node[]
+	 */
+	public function execute()
+	{
+		return $this->nodeService->query($this->query);
+	}
+
 	private function normalizeFrom($typeQNames, $alias=null)
 	{
 		if (is_array($typeQNames) && null !== $alias) {
@@ -109,34 +154,5 @@ class QueryBuilder
 		}
 
 		return $return;
-	}
-
-	public function where($property, $value, $operator=Filter::OPERATOR_EQUALS)
-	{
-		$this->query->addFilter(new Filter($property, $value, $operator));
-
-		return $this;
-	}
-
-	public function X() {
-		$nodeService = new NodeService();
-		$qb = $nodeService->createQueryBuilder();
-
-		$qb->select('contact, address')
-			->select('contact', 'address')
-			->from('App.Types.Property')
-			->where('contact.name', 'Robert Jones')
-//			->orWhere([])
-			->setFirstResult(10)
-			->setMaxResults(20)
-			;
-	}
-
-	/**
-	 * @return Node[]
-	 */
-	public function execute()
-	{
-		return $this->nodeService->query($this->query);
 	}
 }

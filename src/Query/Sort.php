@@ -12,13 +12,12 @@ class Sort extends Property
 	/**
 	 * Sort constructor.
 	 *
-	 * @param string $typeQName
-	 * @param string $field
+	 * @param string $field (preferably fully-qualified field name with type qname, e.g. App.System.Types.SomeType.propertyKey
 	 * @param null $sortDirection
 	 */
-	public function __construct($typeQName, $field, $sortDirection = null)
+	public function __construct(string $field, $sortDirection = null)
 	{
-		parent::__construct($typeQName, $field);
+		parent::__construct($field);
 		$this->sortDirection = $sortDirection;
 	}
 

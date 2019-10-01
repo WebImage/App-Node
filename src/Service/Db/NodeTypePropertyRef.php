@@ -9,5 +9,5 @@ class NodeTypePropertyRef extends NodeTypePropertyDef {
 	// Getters
 	public function getNodeTypeId() { return $this->nodeTypeId; }
 	// Setters
-	public function setNodeTypeID($nodeTypeId) { $this->nodeTypeId = $nodeTypeId; }
+	public function setNodeTypeId($nodeTypeId) { $this->nodeTypeId = $nodeTypeId; }
 }

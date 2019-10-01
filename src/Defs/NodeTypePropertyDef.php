@@ -34,7 +34,7 @@ class NodeTypePropertyDef
 	/**
 	 * @var string
 	 */
-	private $nodeTypeTypeQName; // fully qualified qname for the type that the property is being attached to, e.g. {http://www.cwimage.com/model}base (rather than a QName object)
+	private $nodeTypeQName; // fully qualified qname for the type that the property is being attached to, e.g. WebImage.Types.Base
 	/**
 	 * @var bool
 	 */
@@ -51,7 +51,7 @@ class NodeTypePropertyDef
 	/**
 	 * NodeTypePropertyDef constructor.
 	 *
-	 * @param string $nodeTypeTypeQName
+	 * @param string $nodeTypeQName
 	 * @param string $key
 	 * @param string $name
 	 * @param string $qname
@@ -63,9 +63,9 @@ class NodeTypePropertyDef
 	 *
 	 * @throws \Exception When invalid property configuration is specified
 	 */
-	function __construct($nodeTypeTypeQName, $key, $name, $qname, $required = false, $default = null, $isMultiValued = false, $sortorder = null, Config $config = null)
+	function __construct($nodeTypeQName, $key, $name, $qname, $required = false, $default = null, $isMultiValued = false, $sortorder = null, Config $config = null)
 	{
-		$this->setNodeTypeTypeQName($nodeTypeTypeQName);
+		$this->setNodeTypeQName($nodeTypeQName);
 		$this->setKey($key);
 		$this->setName($name);
 		$this->setQName($qname);
@@ -80,9 +80,9 @@ class NodeTypePropertyDef
 	}
 
 	// Getters
-	public function getNodeTypeTypeQName()
+	public function getNodeTypeQName()
 	{
-		return $this->nodeTypeTypeQName;
+		return $this->nodeTypeQName;
 	}
 
 	public function getKey()
@@ -119,9 +119,9 @@ class NodeTypePropertyDef
 	}
 
 	// Setters
-	public function setNodeTypeTypeQName($qnameStr)
+	public function setNodeTypeQName($qnameStr)
 	{
-		$this->nodeTypeTypeQName = $qnameStr;
+		$this->nodeTypeQName = $qnameStr;
 	}
 
 	public function setKey($key)

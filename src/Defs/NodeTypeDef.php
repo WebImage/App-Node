@@ -5,9 +5,8 @@ namespace WebImage\Node\Defs;
 use WebImage\Config\Config;
 use WebImage\Core\Dictionary;
 use WebImage\Node\Defs\NodeTypePropertyDictionary;
-use WebImage\Node\Service\Db\NodeTypePropertyRef;
 
-class NodeTypeDef {
+class NodeTypeDef implements NodeTypeDefInterface {
 	/**
 	 * @property Dictionary $config Allows configuration values to be stored in a key-value fashion
 	 */
@@ -56,6 +55,10 @@ class NodeTypeDef {
 	 * @property boolean $subClassable Whether other types can extend this type
 	 */
 	private $subClassable;
+	/**
+	 * @var bool $isAbstract Whether nodes can instantiate instances of this type or not
+	 */
+	private $isAbstract = false;
 
 	public function __construct($parent=null, $name=null, $pluralName=null, $qname=null, Config $config=null, $uuid=null, $version=null) {
 		if (null === $config) $config = new Config();
@@ -67,14 +70,14 @@ class NodeTypeDef {
 		$this->setUuid($uuid);
 		$this->setVersion($version);
 		$this->setConfig($config);
-		$this->isReadOnly(false);
-		$this->isSubClassable(true);
+		$this->setReadOnly(false);
+		$this->setFinal(false);
 	}
 
 	/**
 	 * @return string|null
 	 */
-	public function getName()
+	public function getName(): ?string
 	{
 		return $this->name;
 	}
@@ -82,7 +85,7 @@ class NodeTypeDef {
 	/**
 	 * @return string|null
 	 */
-	public function getPluralName()
+	public function getPluralName(): ?string
 	{
 		return $this->pluralName;
 	}
@@ -90,7 +93,7 @@ class NodeTypeDef {
 	/**
 	 * @return QName|null
 	 */
-	public function getQName()
+	public function getQName(): ?string
 	{
 		return $this->qname;
 	}
@@ -98,7 +101,7 @@ class NodeTypeDef {
 	/**
 	 * @return string|null
 	 */
-	public function getUuid()
+	public function getUuid(): ?string
 	{
 		return $this->uuid;
 	}
@@ -106,7 +109,7 @@ class NodeTypeDef {
 	/**
 	 * @return string|null
 	 */
-	public function getVersion()
+	public function getVersion(): ?string
 	{
 		return $this->version;
 	}
@@ -114,7 +117,7 @@ class NodeTypeDef {
 	/**
 	 * @return Config|null
 	 */
-	public function getConfig()
+	public function getConfig(): ?Config
 	{
 		return $this->config;
 	}
@@ -122,25 +125,25 @@ class NodeTypeDef {
 	/**
 	 * @return \WebImage\Node\Defs\NodeTypePropertyDictionary|\WebImage\Node\Defs\NodeTypePropertyDef[]
 	 */
-	public function getProperties()
+	public function getProperties(): NodeTypePropertyDictionary
 	{
 		return $this->properties;
 	}
 
 	/**
-	 * @param $name
+	 * @param $key
 	 *
 	 * @return mixed|null
 	 */
-	public function getProperty($name)
+	public function getProperty($key)
 	{
-		return $this->properties->get($name);
+		return $this->properties->get($key);
 	}
 
 	/**
 	 * @return string|null
 	 */
-	public function getParent()
+	public function getParent(): ?string
 	{
 		return $this->parent;
 	}
@@ -148,7 +151,7 @@ class NodeTypeDef {
 	/**
 	 * @return string[]
 	 */
-	public function getAssociations()
+	public function getAssociations(): array
 	{
 		return $this->associations;
 	}
@@ -156,7 +159,7 @@ class NodeTypeDef {
 	/**
 	 * @return array
 	 */
-	public function getExtensions()
+	public function getExtensions(): array
 	{
 		return $this->extensions;
 	}
@@ -164,7 +167,7 @@ class NodeTypeDef {
 	/**
 	 * @return bool
 	 */
-	public function isExtension()
+	public function isExtension(): bool
 	{
 		return false;
 	}
@@ -205,9 +208,9 @@ class NodeTypeDef {
 		$this->config = $config;
 	}
 
-	public function setProperty($name, NodeTypePropertyRef $definition)
+	public function setProperty($key, NodeTypePropertyDef $definition)
 	{
-		$this->properties->set($name, $definition);
+		$this->properties->set($key, $definition);
 	}
 
 	public function setProperties(NodeTypePropertyDictionary $dictionary)
@@ -233,22 +236,51 @@ class NodeTypeDef {
 		$this->extensions[] = $typeQName;
 	}
 
-	// Combined getters/setters
-	public function isReadOnly($trueFalse = null)
+	/**
+	 * @inheritdoc
+	 */
+	public function isReadOnly(): bool
 	{
-		if (null === $trueFalse) { // Getter
-			return $this->readOnly;
-		} else {
-			$this->readOnly = $trueFalse;
-		}
+		return $this->readOnly;
 	}
 
-	public function isSubClassable($trueFalse = null)
+	/**
+	 * @inheritdoc
+	 */
+	public function isFinal(): bool
 	{
-		if (null === $trueFalse) { // Getter
-			return $this->subClassable;
-		} else {
-			$this->subClassable = $trueFalse;
-		}
+		return $this->isFinal;
+	}
+
+	/**
+	 * @inheritdoc
+	 */
+	public function isAbstract(): bool
+	{
+		return $this->isAbstract;
+	}
+
+	/**
+	 * @inheritdoc
+	 */
+	public function setReadOnly($readOnly)
+	{
+		$this->readOnly = $readOnly;
+	}
+
+	/**
+	 * @inheritdoc
+	 */
+	public function setFinal(bool $isFinal)
+	{
+		$this->isFinal = $isFinal;
+	}
+
+	/**
+	 * @inheritdoc
+	 */
+	public function setAbstract(bool $isAbstract)
+	{
+		$this->isAbstract = $isAbstract;
 	}
 }

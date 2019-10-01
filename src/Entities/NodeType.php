@@ -74,7 +74,7 @@ class NodeType extends AbstractRepositoryEntity
 				// Get type parent extensions
 				$parent_extensions = $parent->getDef()->getExtensions();
 				// Iterate through available extensions for this type
-				while ($extension = $parent_extensions->getNext()) {
+				foreach($parent_extensions as $extension) {
 					// Get extension type
 					$extension_type = $this->getRepository()->getNodeTypeService()->getNodeTypeByTypeQName($extension);
 					// Make sure the extension type is actually defined

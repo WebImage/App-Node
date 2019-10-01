@@ -7,9 +7,23 @@ trait NodeTypeRefTrait
 	private $nodeId;
 	private $tableKey;
 
-	public function getNodeId() { return $this->nodeId; }
-	public function getTableKey() { return $this->tableKey; }
+	public function getNodeId(): ?int
+	{
+		return $this->nodeId;
+	}
 
-	public function setNodeId($id) { $this->nodeId = $id; }
-	public function setTableKey($key) { $this->tableKey = $key; }
+	public function getTableKey(): ?string
+	{
+		return $this->tableKey;
+	}
+
+	public function setNodeId(int $id)
+	{
+		$this->nodeId = $id;
+	}
+
+	public function setTableKey(string $key)
+	{
+		$this->tableKey = $key;
+	}
 }

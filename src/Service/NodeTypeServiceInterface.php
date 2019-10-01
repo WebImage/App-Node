@@ -12,14 +12,14 @@ use WebImage\Node\Entities\NodeTypeAssociation;
  */
 interface NodeTypeServiceInterface extends RepositoryAwareInterface {
 	/** @return NodeType[] */
-	public function getNodeTypes();
+	public function getTypes();
 
 	/**
 	 * @param string $typeQName
 	 *
 	 * @return NodeType|null
 	 */
-	public function getNodeTypeByTypeQName($typeQName);
+	public function getNodeTypeByTypeQName(string $typeQName);
 //	public function createNodeType($parent, $friendlyName, $pluralFriendlyName, $qname=null);
 
 	/**
@@ -32,7 +32,7 @@ interface NodeTypeServiceInterface extends RepositoryAwareInterface {
 	 *
 	 * @return NodeType
 	 */
-	public function create($parent, $friendlyName, $pluralFriendlyName, $qname=null);
+	public function create($parent, $friendlyName, $pluralFriendlyName, $qname=null, $isExtension=false);
 
 	/**
 	 * Save a NodeType

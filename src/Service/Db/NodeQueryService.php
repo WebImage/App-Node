@@ -52,7 +52,6 @@ class NodeQueryService
 		if (null !== $query->getResultsPerPage()) $qb->setMaxResults($query->getResultsPerPage());
 
 		$results = $qb->execute()->fetchAll();
-
 		$nodes = $this->convertResultsToNodes($results);
 
 		return $nodes;
@@ -98,7 +97,7 @@ class NodeQueryService
 		$node = new Node($result['type_qname']);
 		$node->setRepository($repository);
 
-		$nodeRef = new NodeRef($result['uuid'], $result['version'], $result['id']);
+		$nodeRef = new NodeRef($result['uuid'], $result['version'], $result['node_id']);
 		$node->setNodeRef($nodeRef);
 
 		$type = $typeService->getNodeTypeByTypeQName($node->getTypeQName());
@@ -125,7 +124,7 @@ class NodeQueryService
 				/**
 				 * Get Property Definition Original Table
 				 */
-				$propertyDefTypeQName = $propertyDef->getNodeTypeTypeQName();
+				$propertyDefTypeQName = $propertyDef->getNodeTypeQName();
 
 				$propertyDefType = $typeService->getNodeTypeByTypeQName($propertyDefTypeQName);
 
@@ -254,29 +253,31 @@ class NodeQueryService
 //		return $filters;
 //	}
 
-	private function getSorts(Query $query)
-	{
-		if (count($query->getSorts()) > 0) throw new \Exception(__METHOD__ . ' not yet implemented. ' . __FILE__ . ':' . __LINE__);
-		$sorts = [];
-		/**
-		 * Add sorts
-		 */
-		$propertiesInfo = $this->getColumnsForProperties($query, $query->getSorts());
-
-		foreach($propertiesInfo as $propertyInfo) {
-
-			$tableKey = $propertyInfo['tableKey'];
-			$object = $propertyInfo['object'];
-
-			$sort = array(
-				'querySort' => $object,
-				'tableKey' => $tableKey
-			);
-			$sorts[] = $sort;
-		}
-
-		return $sorts;
-	}
+//	private function getSorts(Query $query)
+//	{
+//		$sorts = [];
+//		/**
+//		 * Add sorts
+//		 */
+//
+//		$propertiesInfo = $this->getColumnsForProperties($query, $query->getSorts());
+//
+//		foreach($propertiesInfo as $propertyInfo) {
+//
+//			$tableKey = $propertyInfo->getTableKey();
+//
+//			$tableKey = $propertyInfo['tableKey'];
+//			$object = $propertyInfo['object'];
+//
+//			$sort = array(
+//				'querySort' => $object,
+//				'tableKey' => $tableKey
+//			);
+//			$sorts[] = $sort;
+//		}
+//echo '<pre>';print_r($sorts);echo '<hr />' . __FILE__ .':'.__LINE__;exit;
+//		return $sorts;
+//	}
 
 	private function configureSelect(DbQueryBuilder $qb, Query $query)
 	{
@@ -302,6 +303,7 @@ class NodeQueryService
 			// Add all columns to results
 			foreach($query->getFilterTypeQNames() as $typeQName) {
 				$type = $typeService->getNodeTypeByTypeQName($typeQName);
+				if ($type === null) throw new \RuntimeException(sprintf('Unknown type for filter type: %s', $typeQName));
 				$def = $type->getDef();
 				if (!($def instanceof NodeTypeRef)) continue; // Skip types that do not have table information
 
@@ -316,6 +318,7 @@ class NodeQueryService
 			}
 		}
 	}
+
 	private function configureJoins(DbQueryBuilder $qb, Query $query)
 	{
 		$typeService = $this->getRepository()->getNodeTypeService();
@@ -334,7 +337,7 @@ class NodeQueryService
 		}
 
 		foreach($tables as $tableKey) {
-			$joinConditions = sprintf('%s.node_id = n.id AND %1$s.node_version = n.version', $tableKey);
+			$joinConditions = sprintf('%s.node_id = n.node_id AND %1$s.node_version = n.version', $tableKey);
 			$qb->leftJoin('n', $tableKey, $tableKey, $joinConditions);
 		}
 	}
@@ -447,19 +450,13 @@ class NodeQueryService
 
 	private function configureSorts(DbQueryBuilder $qb, Query $query)
 	{
-		$sorts = $this->getSorts($query);
-
-		foreach($sorts as $sort) {
-			$query_filter = $sort['querySort'];
-			$sort_direction = null;
-
-			if ($query_filter->getSortDirection() == CWI_CNODE_QUERY_Query::SORT_ASC) {
-				$sort_direction = DAOSearch::SORT_ASC;
-			} else if ($query_filter->getSortDirection() == CWI_CNODE_QUERY_Query::SORT_DESC) {
-				$sort_direction = DAOSearch::SORT_DESC;
+		foreach($query->getSorts() as $sort) {
+			$propertyColumns = $this->getColumnsForProperty($query, $sort);
+			foreach($propertyColumns as $sortColumn) {
+				foreach($sortColumn->getColumns() as $column) {
+					$qb->orderBy(sprintf('`%s`.`%s`', $sortColumn->getTableKey(), $column), $sort->getSortDirection());
+				}
 			}
-
-			$search->addSort($sort['tableKey'], $sort['querySort']->getField(), $sort_direction);
 		}
 	}
 	/**

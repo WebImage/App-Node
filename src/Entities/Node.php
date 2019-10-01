@@ -127,7 +127,7 @@ class Node extends AbstractRepositoryEntity {
 	 * @param $name
 	 * @return mixed
 	 */
-	public function getPropertyValue($name)
+	public function getRawPropertyValue($name)
 	{
 		$property = $this->getProperty($name);
 
@@ -138,6 +138,23 @@ class Node extends AbstractRepositoryEntity {
 		}
 
 		return $property->getValue();
+	}
+
+	/**
+	 * Get the value for a given property
+	 *
+	 * @param $name
+	 * @return mixed
+	 */
+	public function getPropertyValue($name)
+	{
+//		$property = $this->getProperty($name);
+		$value = $this->getRawPropertyValue($name);
+
+//		$dataType = $this->getRepository()->getDictionaryService()->getDataType($property->getDef()->getQName());
+//		return $dataType->translateValue($value);
+
+		return $value;
 	}
 
 	/**

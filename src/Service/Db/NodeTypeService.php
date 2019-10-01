@@ -2,6 +2,7 @@
 
 namespace WebImage\Node\Service\Db;
 
+use Doctrine\DBAL\FetchMode;
 use Doctrine\DBAL\Schema\Comparator;
 use Exception;
 use InvalidArgumentException;
@@ -13,6 +14,7 @@ use WebImage\Node\Defs\DataTypeModelField;
 use WebImage\Node\Defs\NodeAssociationDef;
 use WebImage\Node\Defs\NodeTypeAssociationDef;
 use WebImage\Node\Defs\NodeTypeDef;
+use WebImage\Node\Defs\NodeTypeDefInterface;
 use WebImage\Node\Defs\NodeTypePropertyDef;
 use WebImage\Node\Entities\NodeType;
 use WebImage\Node\Entities\NodeTypeAssociation;
@@ -39,11 +41,17 @@ class NodeTypeService implements NodeTypeServiceInterface
 	/**
 	 * @inheritdoc
 	 */
-	public function create($parent, $friendlyName, $pluralFriendlyName, $qname = null)
+	public function create($parent, $friendlyName, $pluralFriendlyName, $qname=null, $isExtension=false)
 	{
-		if (null === $qname) $qname = self::createQNameFromFriendlyName('Node.Types', $friendlyName);
+		if (null === $qname) $qname = self::createQNameFromFriendlyName('Types', $friendlyName);
 
-		$def = new NodeTypeRef($parent, $friendlyName, $pluralFriendlyName, $qname);
+		$def = null;
+
+		if ($isExtension) {
+			$def = new NodeTypeExtensionRef($parent, $friendlyName, $pluralFriendlyName, $qname);
+		} else {
+			$def = new NodeTypeRef($parent, $friendlyName, $pluralFriendlyName, $qname);
+		}
 
 		$type = new NodeType();
 		$type->setRepository($this->getRepository());
@@ -56,7 +64,7 @@ class NodeTypeService implements NodeTypeServiceInterface
 	 * Returns all supported nodes, filterable to only those that can be created (i.e. those with names)
 	 * @return NodeType[]
 	 */
-	public function getNodeTypes()
+	public function getTypes()
 	{
 		return array_filter($this->buildNodeTypes(), function(NodeType $type) {
 			return strlen($type->getDef()->getName()) > 0;
@@ -81,7 +89,7 @@ class NodeTypeService implements NodeTypeServiceInterface
 			$types = $qb->select('nt.*')
 				->addSelect('n.uuid, n.version')
 				->from('node_types', 'nt')
-				->join('nt', 'nodes', 'n', 'n.id = nt.node_id')
+				->join('nt', 'nodes', 'n', 'n.node_id = nt.node_id')
 				->where('n.status = :status')
 				->setParameter(':status', NodeService::NODE_STATUS_ACTIVE)
 				->orderBy('nt.name')
@@ -91,6 +99,7 @@ class NodeTypeService implements NodeTypeServiceInterface
 			foreach($types as $type) {
 				// Build a NodeType from the database data
 				$nodeType = self::createNodeTypeFromData($type);
+
 				// Add the NodeTypeRef to the dictionary
 				$this->getRepository()->getDictionaryService()->setType($nodeType->getDef());
 			}
@@ -123,9 +132,8 @@ class NodeTypeService implements NodeTypeServiceInterface
 	 *
 	 * @return NodeType|null
 	 */
-	public function getNodeTypeByTypeQName($typeQName)
+	public function getNodeTypeByTypeQName(string $typeQName)
 	{
-		if (!is_string($typeQName)) throw new InvalidArgumentException('getNodeTypeByTypeQName called with non-string value');
 		$nodeTypeDef = self::_getNodeTypeRefByTypeQName($typeQName);
 
 		if (null !== $nodeTypeDef) {
@@ -170,11 +178,11 @@ class NodeTypeService implements NodeTypeServiceInterface
 	}
 
 	/**
-	 * Creates a NodeTypePropertyStruct from an existing NodeTypePropertyDef
+	 * Creates a NodeTypePropertyStruct from an existing NodeTypePropertyRef
 	 *
 	 * @return array
 	 */
-	private function createNodeTypePropertyDataFromNodeTypePropertyDef(NodeTypePropertyRef $propertyDef)
+	private function createNodeTypePropertyDataFromNodeTypePropertyRef(NodeTypePropertyRef $propertyDef)
 	{
 		return [
 			'node_type_id' => $propertyDef->getNodeTypeId(),
@@ -194,23 +202,24 @@ class NodeTypeService implements NodeTypeServiceInterface
 	 */
 	public function save(NodeType $type)
 	{
-		// Type Definition
-		$def = $this->getNodeTypeDef($type);
-
 		// Make sure we are not trying to save a read-only cnode type
-		if ($def->isReadOnly()) throw new Exception('Cannot save readonly types');
+		if ($type->getDef()->isReadOnly()) throw new Exception('Cannot save readonly types');
 
 		// It may be possible, especially on importing objects, that an object could have a UUID defined, but not a Node ID.  In this cases we'll need to check if we can fill in the missing Node ID
-		if ($def instanceof NodeTypeRef && null === $def->getNodeId() && null !== $def->getUuid()) {
+		if ($type->getDef() instanceof NodeTypeRefInterface && null === $type->getDef()->getNodeId() && null !== $type->getDef()->getUuid()) {
 			/**
 			 * @TODO Check if node exists under the referenced UUID
 			 */
 			// $def->setNodeId($result->node_id);
+			throw new \RuntimeException('Saving node types with a UUID, but not an existing Node ID are currently not supported');
 		}
 
+		// Only create database table references if this is a locally managed NodeTypeRef
+
 		$this->createNodeTypeRecord($type);
-		$this->createPhysicalTable($def);
-		$this->createTablePropertyRecords($def);
+//		$this->assignPropertyNodeTypeId($type);
+//		$this->createPhysicalTable($type);
+//		$this->createTablePropertyRecords($type);
 	}
 
 	/**
@@ -219,17 +228,19 @@ class NodeTypeService implements NodeTypeServiceInterface
 	 */
 	private function createNodeTypeRecord(NodeType $type)
 	{
-		/** @var NodeTypeRef $def */
-		$def = $this->getNodeTypeDef($type);
+		if (!($type->getDef() instanceof NodeTypeRefInterface)) return;
+
+		$def = $type->getDef();
+
 		if (null !== $def->getNodeId()) return; // This type has already been created
 
 		// Should return null unless this type has already been created
 		$existingType = self::getNodeTypeByTypeQName($def->getQName());
 
-		if ($existingType) {
+		if ($existingType && $existingType->getDef() instanceof NodeTypeRefInterface) {
 			// Should probably prevent nodes from being saved as new if they already exist
 //			throw new \Exception
-			$existingDef = $this->getNodeTypeDef($existingType);
+			$existingDef = $existingType->getDef();
 
 			if (null === $def->getTableKey()) $def->setTableKey($existingDef->getTableKey());
 			if (null === $def->getUuid()) $def->setUuid($existingDef->getUuid());
@@ -240,12 +251,12 @@ class NodeTypeService implements NodeTypeServiceInterface
 		}
 
 		/* @TODO Change QNAME_TYPE and QNAME_EXTENSION to be defined elsewhere? */
-		$QNAME_TYPE = 'WebImage.Node.Types.Type'; // 'com.webimage.system.Type'; // {http://www.cwimage.com/system}type';
-		$QNAME_EXTENSION = 'WebImage.Node.Types.Extension'; // {http://www.cwimage.com/system}extension
+		$QNAME_TYPE = 'WebImage.Types.Type'; // 'com.webimage.system.Type'; // {http://www.cwimage.com/system}type';
+		$QNAME_EXTENSION = 'WebImage.Types.Extension'; // {http://www.cwimage.com/system}extension
 
 		if (null === $type->getNode()) {
 			$nodeService = $this->getRepository()->getNodeService();
-			$node = $nodeService->create($QNAME_TYPE);
+			$node = $nodeService->create($def->isExtension() ? $QNAME_EXTENSION : $QNAME_TYPE);
 			$node->save();
 
 			/** @var NodeRef $nodeRef */
@@ -272,34 +283,60 @@ class NodeTypeService implements NodeTypeServiceInterface
 	}
 
 	/**
+	 * Add corresponding Node Type ID to all properties
+	 * @param NodeType $type
+	 */
+	private function assignPropertyNodeTypeId(NodeType $type)
+	{
+		if (!($type->getDef() instanceof NodeTypeRefInterface)) return; // Bail if this type is not managed by this repository
+
+		foreach($type->getDef()->getProperties() as $key => $propertyDef) {
+			if (!($propertyDef instanceof NodeTypePropertyRef)) continue;
+			$propertyDef->setNodeTypeId($type->getDef()->getNodeId());
+		}
+	}
+
+	/**
 	 * Create the physical database table
 	 * @param NodeTypeRef $def
 	 * @throws Exception
 	 */
-	private function createPhysicalTable(NodeTypeRef $def)
+	private function createPhysicalTable(NodeType $type)
 	{
-		/**
-		 * Create the required table(s)
-		 */
-		if (strlen($def->getTableKey()) == 0) return;
+		if ($type->getDef() instanceof NodeTypeRefInterface && strlen($type->getDef()->getTableKey()) == 0) return;
+
+		$tableKey = ($type->getDef() instanceof NodeTypeRefInterface) ? $type->getDef()->getTableKey() : $this->getTableKeyForDef($type->getDef());
 
 		$cm = $this->getConnectionManager();
 		$conn = $this->getConnectionManager()->getConnection();
 		$sm = $conn->getSchemaManager();
 		$schema = $sm->createSchema();
-		$tableName = $cm->getTableName($def->getTableKey());
+		$tableName = $cm->getTableName($tableKey);
 
 		$existingTable = $schema->hasTable($tableName) ? $schema->getTable($tableName) : null;
 		$table = $existingTable ? clone $existingTable : $schema->createTable($tableName);
 
-		if (!$table->hasColumn('node_id')) $table->addColumn('node_id', Type::BIGINT, array('notnull' => true, 'unsigned' => true));
-		if (!$table->hasColumn('node_version')) $table->addColumn('node_version', Type::INTEGER, array('notnull' => true, 'unsigned' => true, 'default' => 1));
-		if (!$table->hasPrimaryKey()) $table->setPrimaryKey(array('node_id', 'node_version'));
+		if (!$table->hasColumn('node_id')) {
+			$nodeId = $table->addColumn('node_id', Type::BIGINT, ['notnull' => true, 'unsigned' => true]);
+			$nodeId->setAutoincrement(true);
+		}
+		// Make sure version number is large
+		if ($table->hasColumn('version')) {
+			$versionColumn = $table->getColumn('version');
+			$versionColumn->setType(Type::getType(Type::INTEGER));
+			$versionColumn->setNotnull(true);
+			$versionColumn->setUnsigned(true);
+			$versionColumn->setDefault(1);
+		} else {
+			$table->addColumn('version', Type::INTEGER, ['notnull' => true, 'unsigned' => true, 'default' => 1]);
+		}
+
+		if (!$table->hasPrimaryKey()) $table->setPrimaryKey(['node_id', 'version']);
 
 		/**
 		 *  Add properties (only supports simple types for now)
 		 */
-		foreach ($def->getProperties() as $propertyDef) {
+		foreach ($type->getDef()->getProperties() as $propertyDef) {
 
 			// By default, all properties will be attached as columns to the main type table
 			$workingTable = $table;
@@ -309,14 +346,23 @@ class NodeTypeService implements NodeTypeServiceInterface
 			if ($propertyDef->isMultiValued()) {
 
 				// Setup name to be used for property table
-				$propertyTableKey = $def->getTableKey() . '_p_' . $propertyDef->getKey(); // 'cnt_prop_' . $propertyDef->getKey();
+				$propertyTableKey = $tableKey . '_p_' . $propertyDef->getKey(); // 'cnt_prop_' . $propertyDef->getKey();
 				$propertyTableName = $this->getConnectionManager()->getTableName($propertyTableKey);
 				$existingPropertyTable = $schema->hasTable($propertyTableName) ? $schema->getTable($propertyTableName) : null;
 				$propertyTable = $existingPropertyTable ? clone $existingPropertyTable : $schema->createTable($propertyTableName);
 
 				// Add node reference (defined above)
-				if (!$propertyTable->hasColumn('node_id')) $propertyTable->addColumn('node_id', Type::BIGINT, array('notnull' => true, 'unsigned' => true));
-				if (!$propertyTable->hasColumn('node_version')) $propertyTable->addColumn('node_version', Type::BIGINT, array('notnull', true, 'unsigned' => true, 'default' => 1));
+				if (!$propertyTable->hasColumn('node_id')) $propertyTable->addColumn('node_id', Type::BIGINT, ['notnull' => true, 'unsigned' => true]);
+
+				if ($propertyTable->hasColumn('version')) {
+					$versionColumn = $propertyTable->getColumn('version');
+					$versionColumn->setType(Type::getType(Type::BIGINT));
+					$versionColumn->setNotnull(true);
+					$versionColumn->setUnsigned(true);
+					$versionColumn->setDefault(1);
+				} else {
+					$propertyTable->addColumn('version', Type::BIGINT, ['notnull', true, 'unsigned' => true, 'default' => 1]);
+				}
 
 				// Change the working table, since all associated fields will be stored to this separate table
 				$workingTable = $propertyTable;
@@ -348,13 +394,14 @@ class NodeTypeService implements NodeTypeServiceInterface
 				$doctrineType = $this->doctrineTypeMap->getDoctrineType($modelField->getType());
 
 				// Add the created property to the table
-				$arr = $modelField->getOptions()->toArray();
+				$doctrineOptions = $modelField->getOptions()->toArray();
 
+				if (!isset($doctrineOptions['notnull'])) $doctrineOptions['notnull'] = $propertyDef->isRequired();
 
 				if ($workingTable->hasColumn($propertyFieldName)) {
-					$workingTable->changeColumn($propertyFieldName, $modelField->getOptions()->toArray());
+					$workingTable->changeColumn($propertyFieldName, $doctrineOptions);
 				} else {
-					$workingTable->addColumn($propertyFieldName, $doctrineType, $modelField->getOptions()->toArray());
+					$workingTable->addColumn($propertyFieldName, $doctrineType, $doctrineOptions);
 				}
 			}
 
@@ -383,23 +430,42 @@ class NodeTypeService implements NodeTypeServiceInterface
 	 * Add node type property definitions to the Node Type Property table
 	 * @param NodeTypeRef $def
 	 */
-	private function createTablePropertyRecords(NodeTypeRef $def)
+	private function createTablePropertyRecords(NodeType $type)
 	{
+		if (!($type->getDef() instanceof NodeTypeRefInterface)) return; // Do not create property records for types not be managed in this DB
 		/**
 		 * Save property database records
-		 * @var NodeTypePropertyRef $propertyDef
+		 * @var NodeTypePropertyDef $propertyDef
 		 */
-		foreach($def->getProperties() as $property => $propertyDef) {
+		$keys = [];
+		foreach ($type->getDef()->getProperties() as $property => $propertyDef) {
+			$keys[] = $propertyDef->getKey();
+		}
 
-			$isPropertyNew = strlen($propertyDef->getNodeTypeId()) == 0;
-			$propertyDef->setNodeTypeID($def->getNodeId());
+		$qb = $this->getConnectionManager()->createQueryBuilder();
+		$existing = $qb->select('`key`')
+			->from('node_type_properties')
+			->where('`key` IN (:keys)')
+			->andWhere('node_type_id = :node_type_id')
+			->setParameter(':keys', $keys, \Doctrine\DBAL\Connection::PARAM_STR_ARRAY)
+			->setParameter(':node_type_id', $type->getDef()->getNodeId())
+			->execute()
+			->fetchAll();
+		$hasKeys = array_map(function($row) {
+			return $row['key'];
+		}, $existing);
 
-			$nodeTypePropertyData = self::createNodeTypePropertyDataFromNodeTypePropertyDef($propertyDef);
+
+		foreach($type->getDef()->getProperties() as $property => $propertyDef) {
+			$isPropertyNew = !in_array($propertyDef->getKey(), $hasKeys);
+			$propertyDef->setNodeTypeID($type->getDef()->getNodeId());
+
+			$propertyData = self::createNodeTypePropertyDataFromNodeTypePropertyRef($propertyDef);
 
 			if ($isPropertyNew) { // New property
-				$this->insertRecord('node_type_properties', $nodeTypePropertyData);
+				$this->insertRecord('node_type_properties', $propertyData);
 			} else { // Update existing property
-				$this->updateRecord('node_type_properties', $nodeTypePropertyData, [
+				$this->updateRecord('node_type_properties', $propertyData, [
 					'node_type_id' => $propertyDef->getNodeTypeId(),
 					'key' => $propertyDef->getKey()
 				]);
@@ -412,14 +478,43 @@ class NodeTypeService implements NodeTypeServiceInterface
 	 * @param NodeTypeRef $def
 	 * @return string The generated table key
 	 */
-	private function getTableKeyForDef(NodeTypeRef $def): string
+	private function getTableKeyForDef(NodeTypeDefInterface $def): string
 	{
-		$tablePrefix = $def->isExtension() ? 'nx' : 'nt'; // nt = node type; nx = node extension
-		$tableNameBase = $def->getPluralName();
-		$tableNameBase = strtolower($tableNameBase); // Lower case
-		$tableNameBase = preg_replace('/[^0-9a-z_]+/', '', $tableNameBase);
-		$tableNameBase = $tablePrefix . '_' . $tableNameBase;
-
+		$helper = new TableNameHelper();
+		$tableNameBase = $helper->getTableNameFromDef($def);
+//		if ($def instanceof NodeTypeRefInterface && strlen($def->getTableKey()) > 0) return $def->getTableKey(); // Table key already defined
+//		if ($def->getConfig()->has('modelKey')) return $def->getConfig()->get('modelKey'); // Table key defined in config as modelKey
+//
+//		$tablePrefix = $def->isExtension() ? 'nx' : 'nt'; // nt = node type; nx = node extension
+//		$tableNameBase = $def->getPluralName();
+//		if (empty($tableNameBase)) $tableNameBase = $this->generateTableName($def);
+//		$tableNameBase = strtolower($tableNameBase); // Lower case
+//		$tableNameBase = preg_replace('/[^0-9a-z_]+/', '', $tableNameBase);
+//		$tableNameBase = $tablePrefix . '_' . $tableNameBase;
+//
+//		$cm = $this->getConnectionManager();
+//		$conn = $this->getConnectionManager()->getConnection();
+//
+//		$sm = $conn->getSchemaManager();
+//		$tableKey = null;
+//		$count = 1;
+//
+//		do {
+//			$tableKey = $tableNameBase . ($count == 1 ? '' : $count);
+//			$qb = $cm->createQueryBuilder();
+//			$existingCount = $qb->select('*')
+//				->from('node_types')
+//				->where('qname != :qname')
+//				->andWhere('table_key = :tableName')
+//				->setParameters([
+//					':qname' => $def->getQName(),
+//					':tableName' => $tableKey
+//				])
+//				->execute()
+//				->rowCount();
+//		} while ($count++ && $existingCount > 0);
+//
+//		return $tableKey;
 		$cm = $this->getConnectionManager();
 		$conn = $this->getConnectionManager()->getConnection();
 
@@ -545,7 +640,7 @@ class NodeTypeService implements NodeTypeServiceInterface
 		$targetMax = null,
 		$targetStrict = false
 	) {
-		if (null === $assocQName) $assocQName = self::createQNameFromFriendlyName('Node.Associations', $friendlyName);
+		if (null === $assocQName) $assocQName = self::createQNameFromFriendlyName('Associations', $friendlyName);
 
 		$def = new NodeTypeAssociationDef($friendlyName, $sourceType->getDef()->getQName(), $targetType->getDef()->getQName(), $assocQName, $allowDuplicates, $sourceMin, $sourceMax, $sourceStrict, $targetMin, $targetMax, $targetStrict);
 		$association = new NodeTypeAssociation($sourceType, $targetType, $def);
@@ -620,12 +715,18 @@ class NodeTypeService implements NodeTypeServiceInterface
 		$nodeTypeDef = $dictionaryService->getType($typeQName);
 
 		if (null === $nodeTypeDef) {
+			$cm = $this->getConnectionManager();
+			$baseTypeDef = $dictionaryService->getType('WebImage.Types.Base');
+			$baseTable = $cm->getTableName($this->getTableKeyForDef($baseTypeDef));
+
+			$typeTypeDef = $dictionaryService->getType('WebImage.Types.Type');
+			$typeTable = $cm->getTableName($this->getTableKeyForDef($typeTypeDef));
 
 			$qb = $this->getConnectionManager()->createQueryBuilder();
 			$existing = $qb->select('nt.*')
 				->addSelect('n.uuid, n.version')
-				->from('node_types', 'nt')
-				->join('nt', 'nodes', 'n', 'n.id = nt.node_id')
+				->from($typeTable, 'nt')
+				->join('nt', $baseTable, 'n', 'n.node_id = nt.node_id')
 				->where('nt.qname = :qname AND n.status = :status')
 				->setParameter(':qname', $typeQName)
 				->setParameter(':status', NodeService::NODE_STATUS_ACTIVE)
@@ -636,13 +737,13 @@ class NodeTypeService implements NodeTypeServiceInterface
 
 				$nodeTypeDef = self::createNodeTypeRefFromData($existing);
 
-				$qb = $this->getConnectionManager()->createQueryBuilder();
+				$qb = $cm->createQueryBuilder();
 				$associations = $qb->select('d.allow_duplicates, d.tgt_has_many, d.tgt_required, d.tgt_strict, d.name, d.src_has_many, d.src_required, d.src_strict')
 					->addSelect('a.assoc_type_qname, a.tgt_node_id, a.src_node_id')
-					->from('node_associations', 'a')
-					->leftJoin('a', 'node_type_associations', 'd', 'd.assoc_type_qname = a.assoc_type_qname')
-					->leftJoin('a', 'nodes', 'src_node', 'src_node.id = a.src_node_id')
-					->leftJoin('a', 'nodes', 'tgt_node', 'tgt_node.id = a.tgt_node_id')
+					->from($cm->getTableName('node_associations'), 'a')
+					->leftJoin('a', $cm->getTableName('node_type_associations'), 'd', 'd.assoc_type_qname = a.assoc_type_qname')
+					->leftJoin('a', $baseTable, 'src_node', 'src_node.node_id = a.src_node_id')
+					->leftJoin('a', $baseTable, 'tgt_node', 'tgt_node.node_id = a.tgt_node_id')
 					->where('a.src_node_id = ?')
 					->setParameter(0, $nodeTypeDef->getNodeId())
 					->execute()
@@ -723,7 +824,7 @@ class NodeTypeService implements NodeTypeServiceInterface
 	 *
 	 * @return void
 	 **/
-	private function loadNodeTypePropertiesWithNodeTypeRef(NodeTypeRef $nodeTypeDef)
+	private function loadNodeTypePropertiesWithNodeTypeRef(NodeTypeRefInterface $nodeTypeDef)
 	{
 		$nodeTypeId = $nodeTypeDef->getNodeId();
 
@@ -760,7 +861,7 @@ class NodeTypeService implements NodeTypeServiceInterface
 	}
 
 	/**
-	 * Takes an existing database record and turns it into a NodeTypePropertyDef
+	 * Takes an existing database record and turns it into a NodeTypePropertyRef
 	 *
 	 * @param array $data The record to convert
 	 *
@@ -788,13 +889,13 @@ class NodeTypeService implements NodeTypeServiceInterface
 	 * @param NodeTypeRef $cnodeTypeDef A definition to be converted into a NodeTYpe
 	 * @return NodeType a NodeType based on a NodeTypeRef
 	 **/
-	private function createNodeTypeFromNodeTypeDef(NodeTypeDef $nodeTypeDef)
+	private function createNodeTypeFromNodeTypeDef(NodeTypeDef $def)
 	{
-		$cnodeType = new NodeType();
-		$cnodeType->setRepository($this->getRepository());
-		$cnodeType->setDef($nodeTypeDef);
+		$type = new NodeType();
+		$type->setRepository($this->getRepository());
+		$type->setDef($def);
 
-		return $cnodeType;
+		return $type;
 	}
 
 	/**
@@ -817,7 +918,7 @@ class NodeTypeService implements NodeTypeServiceInterface
 	 *
 	 * @return NodeTypeStruct
 	 */
-	private function createNodeTypeDataFromNodeTypeRef(NodeTypeRef $def)
+	private function createNodeTypeDataFromNodeTypeRef(NodeTypeRefInterface $def)
 	{
 		// Create a table key if it does not exist
 		if (null === $def->getTableKey()) {
@@ -871,15 +972,5 @@ class NodeTypeService implements NodeTypeServiceInterface
 	public function importNodeType(Importer $importer, Traversal $xmlNodeType)
 	{
 		return CWI_NODE_SERVICE_NodeType::import($importer, $xmlNodeType);
-	}
-
-	/**
-	 * Convenience method to type NodeTypeRef
-	 * @param NodeType $type
-	 * @return NodeTypeRef
-	 */
-	private function getNodeTypeDef(NodeType $type): NodeTypeRef
-	{
-		return $type->getDef();
 	}
 }

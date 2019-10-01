@@ -73,7 +73,7 @@ class Query
 	/**
 	 * Get the query sorts
 	 *
-	 * @return array
+	 * @return Sort[]
 	 */
 	public function getSorts()
 	{

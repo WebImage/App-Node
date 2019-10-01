@@ -11,9 +11,6 @@ use Exception;
  * @package WebImage\Node\Defs
  */
 class DataType {
-	const OBJECT_TYPE_SIMPLE = 'type-simple';
-	const OBJECT_TYPE_COMPLEX = 'type-complex';
-
 	private $type;
 	private $name; /* Friendly Name */
 	private $phpType;
@@ -25,31 +22,18 @@ class DataType {
 	 **/
 	private $defaultInputElementClass;
 
-	function __construct($type, $name, $object_type, $php_type_or_class_name, $input_element_class_name=null)
+	function __construct($type, $name, $input_element_class_name=null)
 	{
 		$this->setType($type);
 		$this->setName($name);
 
 		$this->defaultInputElementClass = $input_element_class_name;
-
-		if ($object_type == self::OBJECT_TYPE_SIMPLE) {
-
-			$this->setPhpType($php_type_or_class_name);
-
-		} else if ($object_type == self::OBJECT_TYPE_COMPLEX) {
-
-			$this->setPhpClass($php_type_or_class_name);
-
-		} else {
-			throw new Exception('Invalid object type.  Passed value was ' . $object_type . '.  Expecting ' . self::OBJECT_TYPE_SIMPLE . ' or ' . self::OBJECT_TYPE_COMPLEX);
-		}
 	}
 
 	public function getType() { return $this->type; }
 	public function getName() { return $this->name; }
 	public function getPhpType() { return $this->phpType; }
 	public function getPhpClassName() { return $this->phpClassName; }
-	public function getPhpClassFile() { return $this->phpClassFile; }
 	public function getModelFields() { return $this->modelFields; }
 	public function getDefaultInputElementClass() { return $this->defaultInputElementClass; }
 	/**
@@ -57,9 +41,7 @@ class DataType {
 	 **/
 	public function isSimplePhpType()
 	{
-		$php_type = $this->getPhpType();
-		if (empty($php_type)) return false;
-		else return true;
+		return $this->getPhpType() !== null;
 	}
 
 	public function setType($type)
@@ -75,6 +57,7 @@ class DataType {
 	public function setPhpType($type)
 	{
 		$this->phpType = $type;
+		$this->phpClassName = null;
 	}
 
 	public function setDefaultInputElementClass()
@@ -85,6 +68,7 @@ class DataType {
 	public function setPhpClass($php_class_name)
 	{
 		$this->setPhpClassName($php_class_name);
+		$this->phpType = null;
 	}
 
 	private function setPhpClassName($php_class_name)

@@ -4,45 +4,84 @@ return [
 	'types' => [
 		[
 			'qname' => 'WebImage.Types.Root',
-			'model' => ['name' => 'nodes', 'dataSaver' => 'CWI_CNODE_Root']
+			'isAbstract' => true
+//			'model' => ['name' => 'nodes', 'dataSaver' => 'CWI_CNODE_Root']
 		],
 		[
-			'qname' => 'WebImage.Types.Type',
-			'model' => ['name' => 'node_types']
-		],
-		[
-			'isSubClassable' => true,
-//			'parent' => 'cwi:Root',
 			'qname' => 'WebImage.Types.Base',
 			'parent' => 'WebImage.Types.Root',
 			'friendlyName' => 'Title',
-			'model' => ['name' => 'node_base'],
+			'model' => ['name' => 'nodes'],
+			'isFinal' => false,
+			'isAbstract' => true,
 			'properties' => [
-				// CustomTitltePropertyClass would need to extends a lower level property
-				['name' => 'title', 'friendlyName' => 'Title', 'searchable' => true, 'propertyClass' => 'CustomTitlePropertyClass',
-					'type' => 'string', 'dataType' => 'string']
-			]
+				['key' => 'name', 'name' => 'Name', 'searchable' => true, 'type' => 'WebImage.DataTypes.String'],
+				['key' => 'created', 'name' => 'Created', 'type' => 'WebImage.DataTypes.DateTime', 'isReadOnly' => true],
+				['key' => 'created_by', 'name' => 'Created By', 'type' => 'WebImage.DataTypes.Integer', 'isReadOnly' => true],
+				['key' => 'status', 'name' => 'Status', 'type' => 'WebImage.DataTypes.String', 'isReadOnly' => true],
+				['key' => 'type_qname', 'name' => 'Type QName', 'type' => 'WebImage.DataTypes.String', 'isReadOnly' => true],
+				['key' => 'uuid', 'name' => 'UUID', 'type' => 'WebImage.DataTypes.String', 'isReadOnly' => true],
+				['key' => 'version', 'name' => 'Version', 'type' => 'WebImage.DataTypes.Integer', 'isReadOnly' => true],
+				['key' => 'updated', 'name' => 'Updated', 'type' => 'WebImage.DataTypes.DateTime', 'isReadOnly' => true],
+				['key' => 'updated_by', 'name' => 'Updated', 'type' => 'WebImage.DataTypes.Integer', 'isReadOnly' => true]
+			],
+			'config' => ['modelKey' => 'nodes']
 		],
 		[
-			'isSubClassable' => true,
+			'qname' => 'WebImage.Types.Type',
+			'parent' => 'WebImage.Types.Base',
+			'config' => ['modelKey' => 'node_types'],
+//			'properties' => [
+//				['key' => 'config', 'name' => 'Config', 'type' => 'WebImage.DataTypes.Text'],
+//				//['key' => 'node_id', 'name' => '', 'type' => 'WebImage.DataTypes.String'],
+//				['key' => 'is_extension', 'name' => '', 'type' => 'WebImage.DataTypes.String'],
+//				['key' => 'name', 'name' => '', 'type' => 'WebImage.DataTypes.String'],
+//				['key' => 'parent', 'name' => '', 'type' => 'WebImage.DataTypes.String'],
+//				['key' => 'plural_name', 'name' => '', 'type' => 'WebImage.DataTypes.String'],
+//				['key' => 'qname', 'name' => '', 'type' => 'WebImage.DataTypes.String'],
+//				//['key' => 'table_key', 'name' => '', 'type' => 'WebImage.DataTypes.String'],
+//			]
+		],
+		[
+			'qname' => 'WebImage.Types.HierarchyNode',
+			'parent' => 'WebImage.Types.Base',
+			'properties' => [
+				['key' => 'parent', 'name' => 'Parent', 'type' => 'WebImage.DataTypes.Node']
+			],
+//			'extensions' => [
+//				['qname' => 'WebImage.TypeExtensions.Created']
+//			]
+		],
+		[
+			'name' => 'Folder',
+			'pluralName' => 'Folders',
+			'qname' => 'WebImage.Types.Folder',
+			'parent' => 'WebImage.Types.HierarchyNode',
+//			'properties' => [
+//				['key' => 'name', 'name' => 'Name', 'type' => 'WebImage.DataTypes.String']
+//			]
+		],
+		[
+			'name' => 'Content',
+			'pluralName' => 'Content',
+			'isFinal' => false,
 			'qname' => 'WebImage.Types.Content',
 			'parent' => 'WebImage.Types.Base',
 			'model' => ['name' => 'node_content'],
-			'friendlyName' => 'Content',
 			'enableLocales' => false,
 			'enableProfiles' => false,
 			'extensions' => [
 				['name' => 'WebImage.Types.OwnableExtension']
 			],
 			'properties' => [
-				['name' => 'body', 'friendlyName' => 'Body', 'searchable' => true]
+				['key' => 'body', 'name' => 'Body', 'searchable' => true]
 			]
 		],
 
 	],
 	'extensions' => [
-		['qname' => 'WebImage.Types.OwnableExtension', 'model' => ['name' => 'node_publishable']],
-		['qname' => 'WebImage.Types.AuthorableExtension', 'associations' => [
+		['name' => 'Ownable', 'pluralName' => 'Ownables', 'qname' => 'WebImage.Types.OwnableExtension', 'model' => ['name' => 'node_publishable']],
+		['name' => 'Authorable', 'pluralName' => 'Authorables', 'qname' => 'WebImage.Types.AuthorableExtension', 'associations' => [
 			[
 				'qname' => 'WebImage.Types.AuthorExtension',
 				'source' => [
@@ -88,6 +127,14 @@ return [
 			['name' => 'state', 'type' => Type::STRING, 'options' => ['length' => 3, 'notnull' => false]],
 			['name' => 'country', 'type' => Type::STRING, 'options' => ['length' => 255, 'notnull' => false]],
 			['name' => 'zip', 'type' => Type::STRING, 'options' => ['length' => 10, 'notnull' => false]],
-		]]
+		]],
+		['type' => 'WebImage.DataTypes.TypeRef', 'name' => 'Type References', 'modelField' => ['type' => Type::STRING ]]
+//		['type' => 'string', 'alias' => 'WebImage.DataTypes.String'],
+//		['type' => 'text', 'alias' => 'WebImage.DataTypes.Text'],
+//		['type' => 'integer', 'alias' => 'WebImage.DataTypes.Integer'],
+//		['type' => 'date', 'alias' => 'WebImage.DataTypes.Date'],
+//		['type' => 'datetime', 'alias' => 'WebImage.DataTypes.DateTime'],
+//		['type' => 'boolean', 'alias' => 'WebImage.DataTypes.Boolean'],
+//		['type' => 'noderef', 'alias' => 'WebImage.DataTypes.NodeRef']
 	]
 ];

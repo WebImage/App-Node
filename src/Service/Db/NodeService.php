@@ -3,6 +3,7 @@
 namespace WebImage\Node\Service\Db;
 
 use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\Driver\PDOException;
 use Exception;
 use WebImage\Core\Dictionary;
 use WebImage\Db\ConnectionManager;
@@ -123,8 +124,8 @@ class NodeService implements NodeServiceInterface
 		$qb = $this->getConnectionManager()->createQueryBuilder();
 		$count = $qb->select('COUNT(*)')
 			->from('node_associations', 'a')
-			->join('a', 'nodes', 'n', 'n.id = a.src_node_id')
-			->join('n', 'node_types', 't', 't.node_id = n.id')
+			->join('a', 'nodes', 'n', 'n.node_id = a.src_node_id')
+			->join('n', 'node_types', 't', 't.node_id = n.node_id')
 			->where('a.assoc_qname = :assoc_qname AND t.qname IN (:qnames)')
 			->setParameter(':assoc_qname', $typeAssocDef->getQName())
 			->setParameter(':qnames', $typeQNames, Connection::PARAM_STR_ARRAY)
@@ -217,6 +218,7 @@ class NodeService implements NodeServiceInterface
 		if ($new_node) {
 
 			$qb = $this->getConnectionManager()->createQueryBuilder();
+echo 'Name: ' . $node->getPropertyValue('name') . '<br>';die(__FILE__.':'.__LINE__.PHP_EOL);
 
 			$data = [
 				'type_qname' => $nodeType->getDef()->getQName(),
@@ -262,7 +264,6 @@ class NodeService implements NodeServiceInterface
 			// Iterate through properties for this type and attach to model
 			/**
 			 * @var string $fieldName
-			 * @var NodeTypePropertyRef $property
 			 */
 			foreach($properties as $fieldName => $propertyDef) {
 
@@ -405,6 +406,7 @@ die(__FILE__.':'.__LINE__.PHP_EOL);
 									->values($propertyData)
 									->setParameters($propertyParams)
 									->execute();
+								echo '<pre>';print_r($propertyData);
 							}
 						}
 
@@ -563,7 +565,6 @@ die(__FILE__.':'.__LINE__.PHP_EOL);
 
 		$types = $nodeType->getParents();
 		$types[] = $nodeType;
-
 		/**
 		 * Add properties from type and parents
 		 * @var NodeType $type
@@ -622,7 +623,7 @@ die(__FILE__.':'.__LINE__.PHP_EOL);
 
 			// Build Node
 			$node = new Node($nodeData['type_qname']);
-			$nodeRef = new NodeRef($nodeData['uuid'], $nodeData['version'], $nodeData['id']);
+			$nodeRef = new NodeRef($nodeData['uuid'], $nodeData['version'], $nodeData['node_id']);
 			$node->setNodeRef($nodeRef);
 			$node->setRepository($this->getRepository());
 
@@ -667,9 +668,22 @@ die(__FILE__.':'.__LINE__.PHP_EOL);
 		 * @var string $typeQName
 		 * @var NodeType[] $typeStack
 		 */
-		foreach($allTypeQNames as $typeQName => $typeStack) {
-			$this->addSimpleNodeProperties($nodes, $nodeUuidLookup, $typeStack);
-			$this->addMultiNodeProperties($nodes, $nodeUuidLookup, $typeStack);
+		try {
+			foreach ($allTypeQNames as $typeQName => $typeStack) {
+				echo 'TYPE: ' . $typeQName . '<br>';
+				$this->addSimpleNodeProperties($nodes, $nodeUuidLookup, $typeStack);
+				$this->addMultiNodeProperties($nodes, $nodeUuidLookup, $typeStack);
+			}
+		} catch (\PDOException $e) {
+			die(__FILE__ . ':' . __LINE__ . PHP_EOL);
+		} catch (PDOException $e) {
+			die(__FILE__.':'.__LINE__.PHP_EOL);
+		} catch (\Doctrine\DBAL\Exception\SyntaxErrorException $e) {
+			foreach($e->getTrace() as $data) {
+				if (!isset($count)) $count = 0;
+				echo ++$count . ') ' . $data['file'] . ':' . $data['line'] . '<br>';
+			}
+			die(__FILE__.':'.__LINE__.PHP_EOL);
 		}
 	}
 
@@ -917,9 +931,14 @@ die(__FILE__.':'.__LINE__.PHP_EOL);
 						$qb->addSelect(sprintf('%s AS %s', $selectField, $selectAlias));
 					}
 				}
+//			} else {
+//				echo '<pre>';print_r($typeDef);echo '<hr />' . __FILE__ .':'.__LINE__;exit;
 			}
 		}
-
+if ($anyProps) {
+	echo $qb->getSQL() . '<br>';
+	exit;
+}
 		return $anyProps ? $qb->execute()->fetchAll() : [];
 	}
 
@@ -1034,9 +1053,9 @@ die(__FILE__.':'.__LINE__.PHP_EOL);
 
 		$nodeRefsData = $this->getConnectionManager()
 			->createQueryBuilder()
-			->select('n.id, n.uuid, n.version')
+			->select('n.node_id, n.uuid, n.version')
 			->from('node_associations', 'a')
-			->join('a', 'nodes', 'n', 'n.id = a.tgt_node_id AND n.version = a.tgt_node_version')
+			->join('a', 'nodes', 'n', 'n.node_id = a.tgt_node_id AND n.version = a.tgt_node_version')
 			->where('a.src_node_id = :id AND a.src_node_version = :version')
 			->setParameter(':id', $ref->getNodeId())
 			->setParameter(':version', $ref->getVersion())
@@ -1044,7 +1063,7 @@ die(__FILE__.':'.__LINE__.PHP_EOL);
 			->fetchAll();
 
 		return array_map(function($data) {
-			return new NodeRef($data['uuid'], $data['version'], $data['id']);
+			return new NodeRef($data['uuid'], $data['version'], $data['node_id']);
 		}, $nodeRefsData);
 	}
 

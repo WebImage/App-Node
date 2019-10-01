@@ -8,16 +8,17 @@ use WebImage\Node\Defs\DataType;
 use WebImage\Node\Defs\DataTypeModelField;
 use WebImage\Node\Defs\NodeTypeDef;
 use WebImage\Node\Defs\NodeAssociationDef;
+use WebImage\Node\Defs\NodeTypeDefInterface;
 use WebImage\Node\Defs\NodeTypeExtensionDef;
-use WebImage\Node\Types\Type;
 
 //use WebImage\Node\Service\Db\NodeTypeDef;
 //use WebImage\Node\Service\Db\DataType;
 //use WebImage\Node\Service\Db\NodeTypePropertyDef;
-//use WebImage\Node\Service\Db\NodeTypeExtensionDef;
 //use WebImage\Node\Defs\InputElementDefDictionary;
 //use WebImage\Node\Defs\NodeAssociationDef;
 //use WebImage\Node\Defs\NodeTypeAssociationDef;
+use WebImage\Node\Service\Db\NodeTypeRefInterface;
+use WebImage\Node\Service\JsonNodeTypeConverter;
 
 class DictionaryService implements RepositoryAwareInterface
 {
@@ -81,11 +82,6 @@ class DictionaryService implements RepositoryAwareInterface
 		 * Override the default "App" namespace
 		 */
 		$this->localNamespace = $localNamespace;
-
-		$config_file = __DIR__ . '/../../config/dictionary.php';
-		$config = new Config(require($config_file));
-
-		$this->addConfig($config);
 	}
 
 	/**
@@ -157,50 +153,16 @@ class DictionaryService implements RepositoryAwareInterface
 	 */
 	private function processTypeOrExtension($whichType, Config $type)
 	{
-		$name = $type->get('name');
-		$friendly_name = $type->get('friendlyName');
-		$parent = $type->get('parent');
+		if (!in_array($whichType, [self::$TYPE_STANDARD, self::$TYPE_EXTENSION])) throw new Exception('Unsupported type');
 
-		// Make sure the object has a
-		if (empty($friendly_name)) $friendly_name = $name;
+		$converter = new JsonNodeTypeConverter($this->getRepository());
+		$aType = $type->toArray();
+		$aType['isExtension'] = $whichType == self::$TYPE_EXTENSION;
 
-		/**
-		 * Process qname
-		 */
-		$qname = $type->get('qname');
+		#$type = $converter->fromArray($aType);
+		$def = $converter->typeDefFromArray($aType);
 
-		// If QName is still empty then we have a serious problem
-		if (empty($qname)) {
-			throw new Exception('Undefined qname');
-		}
-
-		$type_def = null;
-
-		if ($whichType == self::$TYPE_STANDARD) {
-			$type_def = new NodeTypeDef();
-		} else if ($whichType == self::$TYPE_EXTENSION) {
-			$type_def = new NodeTypeExtensionDef();
-		} else {
-			throw new Exception('Unsupported type');
-		}
-
-		$type_def->setName($friendly_name);
-		$type_def->setQName($qname);
-
-		if (null !== $parent) {
-			$type_def->setParent($parent);
-		}
-
-		foreach($type->get('associations', []) as $association) {
-			$association_qname = $association->get('qname');
-			$type_def->addAssociation($association_qname);
-		}
-
-		foreach($type->get('extensions', []) as $extension) {
-			$extension_qname = $extension->get('name');
-			$type_def->addExtension($extension_qname);
-		}
-
+		return $def;
 
 //		if ($xml_model = $type->getPathSingle('model')) {
 //
@@ -274,7 +236,7 @@ class DictionaryService implements RepositoryAwareInterface
 //			}
 //		}
 
-		return $type_def;
+//		return $type_def;
 	}
 
 	public function addConfig(Config $config)
@@ -284,6 +246,7 @@ class DictionaryService implements RepositoryAwareInterface
 		 * @var Config $type
 		 */
 		foreach($config->get('namespaces', []) as $namespace) {
+			throw new \RuntimeException('Adding namespaces is not currently supported');
 			$prefix = $namespace->get('prefix');
 			$uri = $namespace->get('uri');
 			$this->namespaces->set($prefix, $uri);
@@ -294,10 +257,8 @@ class DictionaryService implements RepositoryAwareInterface
 		 * @var Config $type
 		 */
 		foreach ($config->get('types', []) as $type) {
-			$type_def = self::processTypeOrExtension(self::$TYPE_STANDARD, $type);
-			$type_def->isReadOnly(true); // Make sure that changes can't be made to these...
-			$type_def->isSubClassable($type->get('isSubClassable'));
-			$this->types->set($type_def->getQName(), $type_def);
+			$typeDef = self::processTypeOrExtension(self::$TYPE_STANDARD, $type);
+			$this->types->set($typeDef->getQName(), $typeDef);
 		}
 
 		/**
@@ -307,7 +268,7 @@ class DictionaryService implements RepositoryAwareInterface
 		foreach ($config->get('extensions', []) as $extension) {
 			$extension_def = self::processTypeOrExtension(self::$TYPE_EXTENSION, $extension);
 			$extension_def->isReadOnly(true); // Make sure that changes can't be made to these...
-			$extension_def->isSubClassable(false); // Extensions are not currently extendable
+			$extension_def->isFinal(true); // Extensions are not currently extendable
 			$this->types->set($extension_def->getQName(), $extension_def);
 		}
 
@@ -320,17 +281,15 @@ class DictionaryService implements RepositoryAwareInterface
 			$type = $dataType->get('type');
 			$name = $dataType->get('name');
 			$phpType = trim($dataType->get('phpType'));
-			$phpClassName = trim($dataType->get('phpClassName'));
-			$inputElement = $dataType->get('defaultInputElementClass');
+//			$inputElement = $dataType->get('defaultInputElementClass');
 
-			$object_type = DataType::OBJECT_TYPE_SIMPLE;
+			$dtype = new DataType($type, $name);
 
-			if ($dataType->get('phpClassFile')) {
-				$object_type = DataType::OBJECT_TYPE_COMPLEX;
-				$phpType = $phpClassName;
+			if ($dataType->has('phpClassFile')) {
+				$dtype->setPhpClass($dataType->get('phpClassFile'));
+			} else if ($dataType->has('phpType')) {
+				$dtype->setPhpType($dataType->get('phpType'));
 			}
-
-			$dtype = new DataType($type, $name, $object_type, $phpType, $inputElement);
 
 			$modelFields = $dataType->has('modelFields') ? $dataType->get('modelFields') : [];
 			if ($dataType->has('modelField')) $modelFields[] = $dataType->get('modelField');
@@ -355,13 +314,13 @@ class DictionaryService implements RepositoryAwareInterface
 	 *
 	 * @return mixed|null
 	 */
-	public function getType($typeQNameStr)
+	public function getType($typeQNameStr): ?NodeTypeDefInterface
 	{
 		return $this->types->get($typeQNameStr);
 	}
 
 	/**
-	 * @return Dictionary A dictionary of defined types
+	 * @return Dictionary|NodeTypeDef[] A dictionary of defined types
 	 */
 	public function getTypes()
 	{
