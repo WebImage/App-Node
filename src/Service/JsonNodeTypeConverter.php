@@ -5,6 +5,7 @@ namespace WebImage\Node\Service;
 use WebImage\Config\Config;
 use WebImage\Core\Dictionary;
 use WebImage\Node\Defs\NodeTypeDef;
+use WebImage\Node\Defs\NodeTypeDefInterface;
 use WebImage\Node\Defs\NodeTypeExtensionDef;
 use WebImage\Node\Defs\NodeTypePropertyDef;
 use WebImage\Node\Entities\NodeType;
@@ -60,7 +61,7 @@ class JsonNodeTypeConverter
 		$typeService = $repository->getNodeTypeService();
 
 		$type = $typeService->create($parent, $name, $pluralName);
-		$type->setDef($this->typeDefFromArray($json));
+		$this->configureTypeDef($type->getDef(), $data);
 
 		return $type;
 	}
@@ -74,6 +75,19 @@ class JsonNodeTypeConverter
 	{
 		$data = new Config($json);
 
+		$def = null;
+
+		if ($data->get('isExtension', false) === true) {
+			$def = new NodeTypeExtensionDef();
+		} else {
+			$def = new NodeTypeDef();
+		}
+
+		return $this->configureTypeDef($def, $data);
+	}
+
+	private function configureTypeDef(NodeTypeDefInterface $def, Config $data): NodeTypeDefInterface
+	{
 		$this->assertHasRequiredTypeVars($data);
 
 		$parent = $data->get('parent');
@@ -94,16 +108,17 @@ class JsonNodeTypeConverter
 		$isFinal = $data->get('isFinal', null);
 		$isAbstract = $data->get('isAbstract');
 
-		if ($isExtension === true) {
-			$def = new NodeTypeExtensionDef($parent, $name, $pluralName, $qname);
-		} else {
-			$def = new NodeTypeDef($parent, $name, $pluralName, $qname);
-		}
+		$repository = $this->getRepository();
+		$typeService = $repository->getNodeTypeService();
+
+		if (null !== $parent) $def->setParent($parent);
+		if (null !== $name) $def->setName($name);
+		if (null !== $pluralName) $def->setPluralName($pluralName);
+		if (null !== $qname) $def->setQName($qname);
 		if (null !== $config) $def->setConfig($config);
 		if (null !== $isFinal) $def->setFinal($isFinal);
 		if (null !== $isReadOnly) $def->isReadOnly($isReadOnly);
 		if (null !== $isAbstract) $def->isAbstract($isAbstract);
-
 
 		$this->attachJsonPropertiesToTypeDef($def, $properties);
 
@@ -132,7 +147,7 @@ class JsonNodeTypeConverter
 		$properties = [];
 		foreach($type->getDef()->getProperties() as $propDef) {
 			$properties[] = [
-				'qname' => $propDef->getQName(),
+				'qname' => $propDef->getDataType(),
 				'name' => $propDef->getName(),
 				'isReadOnly' => $propDef->isReadOnly(),
 				'config' => $propDef->getConfig()->toArray(),
@@ -154,7 +169,7 @@ class JsonNodeTypeConverter
 			'config' => $def->getConfig()->toArray(),
 			'isExtension' => $def->isExtension(),
 			'isAbstract' => $def->isAbstract(),
-			'uuid' => $def->getUuid(),
+			'node_uuid' => $def->getUuid(),
 			'version' => $def->getVersion(),
 			'properties' => $properties,
 			'associations' => $def->getAssociations(),
@@ -182,7 +197,7 @@ class JsonNodeTypeConverter
 		foreach($properties as $property) {
 			$key = $property->get('key');
 			$name = $property->get('name');
-			$propertyType = $property->get('type');
+			$type = $property->get('type');
 			$required = $property->get('required', false);
 			$default = $property->get('default');
 			$isMultiValued = $property->get('isMultiValued', false);
@@ -191,21 +206,23 @@ class JsonNodeTypeConverter
 			$config = null; // $property->get('config');
 
 			// Check name
-			if (empty($name)) throw new \Exception(sprintf('Property at index %d is missing property "name"', $ix));
+			foreach(compact('key', 'name', 'type') as $strKey => $strValue) {
+				if (null === $strValue) throw new \Exception(sprintf('Missing property "%s" (%s)', $strKey, $def->getQName()));
+				else if (!is_string($strValue)) throw new \Exception(sprintf('Property "%s" (%s) must be a string', $key, $def->getQName()));
+			}
 
 			// Verify boolean values
-			foreach(['required', 'isMultiValued', 'isReadOnly'] as $requiredBool) {
-				$boolVal = $$requiredBool;
-				if (null !== $boolVal && !is_bool($boolVal)) throw new \Exception(sprintf('Property "%s" at index %d must be a boolean value', $requiredBool, $ix));
+			foreach(compact('required', 'isMultiValued', 'isReadOnly') as $boolKey => $boolVal) {
+				if (null !== $boolVal && !is_bool($boolVal)) throw new \Exception(sprintf('Property "%s" (%s) must be a boolean value', $boolKey, $def->getQName()));
 			}
 
 			// Verify integer values
-			foreach(['sortorder'] as $requiredInt) {
-				$intVal = $$requiredInt;
-				if (null !== $intVal && !is_int($intVal)) throw new \Exception(sprintf('Property "%s" at index %d must be an integer value', $requiredInt, $ix));
+			foreach(compact('sortorder') as $intKey => $intVal) {
+				if (null !== $intVal && !is_int($intVal)) throw new \Exception(sprintf('Property "%s" (%s)must be an integer value', $intKey, $def->getQName()));
 			}
 
-			$propertyDef = $this->getRepository()->getNodeTypeService()->createPropertyDef($def->getQName(), $key, $name, $propertyType, $required, $default, $isMultiValued, $sortorder, $config);
+			$propertyDef = $this->getRepository()->getNodeTypeService()->createPropertyDef($def->getQName(), $key, $name, $type, $required, $default, $isMultiValued, $sortorder, $config);
+
 			if (null !== $isReadOnly) $propertyDef->isReadOnly($isReadOnly);
 
 			$def->setProperty($key, $propertyDef);
