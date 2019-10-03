@@ -66,7 +66,7 @@ interface NodeTypeDefInterface
 	public function getAssociations(): array;
 
 	/**
-	 * @return array
+	 * @return string[]
 	 */
 	public function getExtensions(): array;
 
@@ -96,4 +96,57 @@ interface NodeTypeDefInterface
 	public function setAbstract(bool $isAbstract);
 	public function setReadOnly(bool $isReadOnly);
 	public function setFinal(bool $isFinal);
+
+	public function setName(string $name);
+
+	/**
+	 * @param string $pluralName
+	 */
+	public function setPluralName(string $pluralName);
+
+	/**
+	 * @param string $qname
+	 */
+	public function setQName(string $qname);
+
+	/**
+	 * @param string $uuid
+	 */
+	public function setUuid(string $uuid);
+
+	/**
+	 * @param int $version
+	 */
+	public function setVersion(int $version);
+
+	/**
+	 * @param Config $config
+	 */
+	public function setConfig(Config $config);
+
+	/**
+	 * @param string $key
+	 * @param NodeTypePropertyDef $definition
+	 */
+	public function setProperty(string $key, NodeTypePropertyDef $definition);
+
+	/**
+	 * @param NodeTypePropertyDictionary $dictionary
+	 */
+	public function setProperties(NodeTypePropertyDictionary $dictionary);
+
+	/**
+	 * @param string $parent The name of the types parent
+	 */
+	public function setParent(string $parent);
+
+	/**
+	 * @param string $association
+	 */
+	public function addAssociation(string $association);
+
+	/**
+	 * @param string $typeQName
+	 */
+	public function addExtension(string $typeQName);
 }
