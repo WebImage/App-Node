@@ -117,8 +117,8 @@ class JsonNodeTypeConverter
 		if (null !== $qname) $def->setQName($qname);
 		if (null !== $config) $def->setConfig($config);
 		if (null !== $isFinal) $def->setFinal($isFinal);
-		if (null !== $isReadOnly) $def->isReadOnly($isReadOnly);
-		if (null !== $isAbstract) $def->isAbstract($isAbstract);
+		if (null !== $isReadOnly) $def->setReadOnly($isReadOnly);
+		if (null !== $isAbstract) $def->setAbstract($isAbstract);
 
 		$this->attachJsonPropertiesToTypeDef($def, $properties);
 
@@ -223,7 +223,7 @@ class JsonNodeTypeConverter
 
 			$propertyDef = $this->getRepository()->getNodeTypeService()->createPropertyDef($def->getQName(), $key, $name, $type, $required, $default, $isMultiValued, $sortorder, $config);
 
-			if (null !== $isReadOnly) $propertyDef->isReadOnly($isReadOnly);
+			if (null !== $isReadOnly) $propertyDef->setReadOnly($isReadOnly);
 
 			$def->setProperty($key, $propertyDef);
 		}

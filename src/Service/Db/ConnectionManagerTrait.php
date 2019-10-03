@@ -21,11 +21,11 @@ trait ConnectionManagerTrait {
 		$this->connectionManager = $connectionManager;
 	}
 
-	private function insertRecord($tableName, array $data)
+	private function insertRecord(string $tableKey, array $data)
 	{
 		$qb = $this->getConnectionManager()
 			->createQueryBuilder()
-			->insert($tableName);
+			->insert($tableKey);
 
 		foreach($data as $key => $val) {
 			$qb->setValue('`' . $key . '`', ':'  . $key);
@@ -35,11 +35,11 @@ trait ConnectionManagerTrait {
 		return $qb->execute();
 	}
 
-	private function updateRecord($tableName, array $data, array $where)
+	private function updateRecord(string $tableKey, array $data, array $where)
 	{
 		$qb = $this->getConnectionManager()
 			->createQueryBuilder()
-			->update($tableName);
+			->update($tableKey);
 
 		foreach($data as $key => $val) {
 			$qb->set('`' . $key . '`', ':' . $key);
@@ -54,11 +54,11 @@ trait ConnectionManagerTrait {
 		return $qb->execute();
 	}
 
-	private function deleteRecord($tableName, array $where)
+	private function deleteRecord(string $tableKey, array $where)
 	{
 		$qb = $this->getConnectionManager()
 			->createQueryBuilder()
-			->delete($tableName);
+			->delete($tableKey);
 
 		foreach($where as $key => $val) {
 			$qb->andWhere('`' . $key . '` = :' . $key);

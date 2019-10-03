@@ -63,7 +63,7 @@ class NodeTypeDef implements NodeTypeDefInterface {
 	public function __construct($parent=null, $name=null, $pluralName=null, $qname=null, Config $config=null, $uuid=null, $version=null) {
 		if (null === $config) $config = new Config();
 		$this->properties = new NodeTypePropertyDictionary();
-		$this->setParent($parent);
+		if (null !== $parent) $this->setParent($parent);
 		$this->setName($name);
 		$this->setPluralName(null === $pluralName ? $name : $pluralName);
 		$this->setQName($qname);
@@ -169,6 +169,8 @@ class NodeTypeDef implements NodeTypeDefInterface {
 	 */
 	public function isExtension(): bool
 	{
+		if (func_num_args() > 0) throw new \InvalidArgumentException(sprintf('%s (%s) does not accept any arguments', __METHOD__, $this->getQName()));
+
 		return false;
 	}
 
@@ -219,9 +221,13 @@ class NodeTypeDef implements NodeTypeDefInterface {
 	}
 
 	/**
+	 * Sets the types parent.
+	 * $parent should NEVER be null, as this would indicate a ROOT node type, and there
+	 * should already have been one defined (when the constructor value would be NULL)
+	 *
 	 * @param string $parent The name of the types parent
 	 */
-	public function setParent($parent)
+	public function setParent(string $parent)
 	{
 		$this->parent = $parent;
 	}
@@ -241,6 +247,8 @@ class NodeTypeDef implements NodeTypeDefInterface {
 	 */
 	public function isReadOnly(): bool
 	{
+		if (func_num_args() > 0) throw new \InvalidArgumentException(sprintf('%s (%s) does not accept any arguments', __METHOD__, $this->getQName()));
+
 		return $this->readOnly;
 	}
 
@@ -249,6 +257,8 @@ class NodeTypeDef implements NodeTypeDefInterface {
 	 */
 	public function isFinal(): bool
 	{
+		if (func_num_args() > 0) throw new \InvalidArgumentException(sprintf('%s (%s) does not accept any arguments', __METHOD__, $this->getQName()));
+
 		return $this->isFinal;
 	}
 
@@ -257,6 +267,8 @@ class NodeTypeDef implements NodeTypeDefInterface {
 	 */
 	public function isAbstract(): bool
 	{
+		if (func_num_args() > 0) throw new \InvalidArgumentException(sprintf('%s (%s) does not accept any arguments', __METHOD__, $this->getQName()));
+
 		return $this->isAbstract;
 	}
 

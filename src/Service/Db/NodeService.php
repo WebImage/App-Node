@@ -190,87 +190,68 @@ class NodeService implements NodeServiceInterface
 		$types = $nodeType->getParents();
 
 		$types[] = $nodeType;
-//		array_shift($types); // Remove base: nodes
 
 		// Make sure created as an actual value, otherwise set it to null so that the DataAccessObject will know to auto-set its date
-		if (empty($created)) $created = null;
+		$updated = date('Y-m-d H:i:s');
+		$updatedBy = 0;
+		$typeService = $this->getRepository()->getNodeTypeService();
+		$tableNameHelper = $this->getTableNameHelper();
+
+		$baseType = $tableNameHelper->getRootType($typeService, $types);
+		$baseTableKey = $tableNameHelper->getTableKeyFromDef($baseType->getDef());
+
+		if (null === $baseType) throw new \RuntimeException('Unable to find node root table');
 
 		if ($new_node) {
 
-			$qb = $this->getConnectionManager()->createQueryBuilder();
-
-			$root = null;
-			$rootTypeKey = null;
-
-			foreach($types as $type) {
-				if (!$this->getTableNameHelper()->shouldDefHavePhysicalTable($type->getDef())) continue;
-				$typeTable = $this->getTableNameHelper()->getTableNameFromDef($type->getDef());
-
-				$root = $type;
-				$rootTableKey = $typeTable;
-				break; // If we made it here, we're good
-			}
-
-			if (null === $root) throw new \RuntimeException('Unable to find node root table');
-
 			$node->setPropertyValue('node_uuid', Uuid::v4());
-			$node->setPropertyValue('created', date('Y-m-d H:i:s'));
-			$node->setPropertyValue('updated', date('Y-m-d H:i:s'));
+			$node->setPropertyValue('created', $updated);
+			$node->setPropertyValue('created_by', $updatedBy);
+			$node->setPropertyValue('updated', $updated);
+			$node->setPropertyValue('updated_by', $updatedBy);
 			$node->setPropertyValue('type_qname', $nodeType->getDef()->getQName());
-			$data = [];
 
-			foreach($root->getDef()->getProperties() as $key => $property) {
+			$data = [];
+			foreach($baseType->getDef()->getProperties() as $key => $property) {
 				$data[$key] = $node->getPropertyValue($key);
 			}
 
-//			$data = [
-//				'type_qname' => $nodeType->getDef()->getQName(),
-//				'created' => $created,
-//				'created_by' => $createdBy,
-//				'node_uuid' => Uuid::v4(),
-//				'node_version' => 1,
-//			];
-//
-//			echo 'Name: ' . $node->getPropertyValue('name') . '<br>';
-//			echo 'Type: ' . $nodeType->getDef()->getQName() . '<br>';
-//			echo '<pre>';print_r($nodeType->getDef());echo '<hr />' . __FILE__ .':'.__LINE__;exit;
-//			echo '<pre>';print_r($data);echo '<hr />' . __FILE__ .':'.__LINE__;exit;
+			$this->insertRecord($baseTableKey, $data);
 
-			$qb->insert('nodes')
-				->values(array_map(function() { return '?'; }, $data))
-				->setParameters(array_values($data))
-				->execute();
-
-			$nodeRef = new NodeRef($data['node_uuid'], $data['node_version'], $qb->getConnection()->lastInsertId());
+			$nodeRef = new NodeRef($data['node_uuid'], $data['node_version']);
 			$node->setNodeRef($nodeRef);
 
 		} else {
-			die(__FILE__.':'.__LINE__.PHP_EOL);
-			$node_struct = NodeLogic::getNodeByUuid($node->getUuid());
-			$node_struct->created = $created;
-			$node_struct->created_by = $createdBy;
 
-			NodeLogic::save($node_struct);
+			$node->setPropertyValue('updated', $updated);
+			$node->setPropertyValue('updated_by', $updatedBy);
+			$node->setPropertyValue('type_qname', $nodeType->getDef()->getQName());
+
+			$data = [];
+			foreach($baseType->getDef()->getProperties() as $key => $property) {
+				$data[$key] = $node->getPropertyValue($key);
+			}
+
+			$this->updateRecord($baseTableKey, $data, ['node_uuid' => $node->getUuid(), 'node_version' => $node->getVersion()]);
 		}
 
 		/** @var NodeType $type */
 		foreach ($types as $type) {
 			if (!($type->getDef() instanceof NodeTypeRef)) continue;
+			if (!$tableNameHelper->shouldDefHavePhysicalTable($type->getDef())) continue;
 
 			$typeDef = $type->getDef();
 			$typeQName = $typeDef->getQName();
 			$tableKey = $typeDef->getTableKey();
 			$properties = $typeDef->getProperties();
 
-			#if (!$model = CWI_MANAGER_ModelManager::getModel($typeDef->getTableKey(), false, false)) throw new Exception('Unable to locate model for ' . $typeDef->getTableKey());
-			#$model_fields = $model->getFields();
 			$typeData = [];
 			$primaryKeys = [];
 
 			$this->getConnectionManager()->getTableName($tableKey);
 
-			// Iterate through properties for this type and attach to model
 			/**
+			 * Iterate through properties for this type and attach to model
 			 * @var string $fieldName
 			 */
 			foreach($properties as $fieldName => $propertyDef) {
@@ -381,6 +362,8 @@ class NodeService implements NodeServiceInterface
 //								$qb = $this->getConnectionManager()->createQueryBuilder();
 //								$qb->insert($propertyTableKey)
 //									->values(['']
+echo 'Update to use convenience methods ->insertRecord and updateRecord<br>';
+die(__FILE__.':'.__LINE__.PHP_EOL);
 								$propertyData = [
 									'node_uuid' => ':node_uuid',
 									'node_version' => ':version'
@@ -469,6 +452,7 @@ die(__FILE__.':'.__LINE__.PHP_EOL);
 
 			// Check if this is a new record so that we can create it if necessary
 			$qb = $this->getConnectionManager()->createQueryBuilder();
+
 			$qb->select('COUNT(*) AS total')
 				->from($tableKey);
 
@@ -565,15 +549,15 @@ die(__FILE__.':'.__LINE__.PHP_EOL);
 			foreach($properties as $fieldName => $def) {
 
 				if ($def->isMultiValued()) {
-					$node_property = new MultiValueProperty();
-					if (null !== $def->getDefault()) $node_property->addValue($def->getDefault());
+					$nodeProperty = new MultiValueProperty();
+					if (null !== $def->getDefault()) $nodeProperty->addValue($def->getDefault());
 				} else {
-					$node_property = new Property();
-					$node_property->setValue($def->getDefault());
+					$nodeProperty = new Property();
+					$nodeProperty->setValue($def->getDefault());
 				}
 
-				$node_property->setDef($def);
-				$node->addProperty($fieldName, $node_property);
+				$nodeProperty->setDef($def);
+				$node->addProperty($fieldName, $nodeProperty);
 			}
 		}
 
@@ -591,6 +575,7 @@ die(__FILE__.':'.__LINE__.PHP_EOL);
 	 */
 	public function getNodesByUuids(array $uuids)
 	{
+		/** @var Node[] $nodes */
 		$nodes = new Dictionary(); // [uuid] => Node
 
 		$qb = $this->getConnectionManager()->createQueryBuilder();
@@ -728,12 +713,18 @@ die(__FILE__.':'.__LINE__.PHP_EOL);
 	 */
 	private function addSimpleNodeProperties(Dictionary $nodes, array $typeStack)
 	{
-		$nodeUuids = $this->extractNodeUuidsForPrimaryType($nodes, $typeStack[0]->getDef()->getQName());
+		$nodeUuids = $nodes->keys();
+
 		$results = $this->getNodeDataResultsForTypes($nodeUuids, $typeStack);
+		$typeService = $this->getRepository()->getNodeTypeService();
+		$tableNameHelper = $this->getTableNameHelper();
+		$rootType = $tableNameHelper->getRootType($typeService, $typeStack);
+		$rootTableKey = $tableNameHelper->getTableKeyFromDef($rootType->getDef());
+		$uuidAlias = $tableNameHelper->getColumnNameAlias($rootTableKey, 'node_uuid');
 
 		foreach($results as $result) {
 
-			$uuid = $result['node_uuid'];
+			$uuid = $result[$uuidAlias];
 			/** @var Node $node */
 			$node = $nodes->get($uuid);
 
@@ -742,6 +733,8 @@ die(__FILE__.':'.__LINE__.PHP_EOL);
 
 				/** @var NodeTypeDef|NodeTypeRef $typeDef */
 				$typeDef = $type->getDef();
+				if (!$tableNameHelper->shouldDefHavePhysicalTable($typeDef)) continue; // No sense in trying to get values from a table that does not exist
+				$typeTableKey = $tableNameHelper->getTableKeyFromDef($typeDef);
 
 				$properties = $typeDef->getProperties();
 				/** @var NodeTypePropertyDef $propertyDef */
@@ -757,13 +750,13 @@ die(__FILE__.':'.__LINE__.PHP_EOL);
 
 						$dataType = $this->getRepository()->getDataTypeService()->getDataType($propertyDef->getDataType());
 
-						$resultKey = sprintf('%s__%s', $typeDef->getTableKey(), $propertyDef->getKey());
-
 						$property = new Property();
 						$property->setDef($propertyDef);
+						$columnKey = $propertyDef->getKey();
 
 						if (null === $dataType) { // This probably shouldn't happen, because $dataType should be valid... but just in case let's see if we can salvage some sort of value if the key exists in the table result set
 
+							$resultKey = $tableNameHelper->getColumnNameAlias($typeTableKey, $columnKey);
 							$value = isset($result[$resultKey]) ? $result[$resultKey] : null;
 							$property->setValue($value);
 							$node->addProperty($propertyDef->getKey(), $property);
@@ -773,10 +766,11 @@ die(__FILE__.':'.__LINE__.PHP_EOL);
 							// Whether the value is stored in a single column...
 							if ($dataType->isSimpleStorage()) {
 
+								$resultKey = $tableNameHelper->getColumnNameAlias($typeTableKey, $columnKey);
 								$value = isset($result[$resultKey]) ? $result[$resultKey] : null;
 								$property->setValue($value);
 
-								// Or multiple columns
+							// Or multiple columns
 							} else {
 
 								$dataTypeModelFields = $dataType->getModelFields();
@@ -785,8 +779,8 @@ die(__FILE__.':'.__LINE__.PHP_EOL);
 
 								foreach ($dataTypeModelFields as $dataTypeModelField) {
 									// Database field name
-									$fieldName = $resultKey . '_' . $dataTypeModelField->getName();
-									$value = isset($result[$fieldName]) ? $result[$fieldName] : null;
+									$resultKey = $tableNameHelper->getColumnNameAlias($typeTableKey, $columnKey, $dataTypeModelField->getName());
+									$value = isset($result[$resultKey]) ? $result[$resultKey] : null;
 									$d->set($dataTypeModelField->getName(), $value);
 								}
 
@@ -801,50 +795,12 @@ die(__FILE__.':'.__LINE__.PHP_EOL);
 	}
 
 	/**
-	 * Get Node IDs that apply to a node type qname
-	 *
-	 * @param Dictionary $nodes
-	 * @param $primaryTypeQName
-	 *
-	 * @return array
-	 */
-	private function extractNodeUuidsForPrimaryType(Dictionary $nodes, $primaryTypeQName)
-	{
-		$nodesOfType = $this->filterNodesByPrimaryType($nodes, $primaryTypeQName);
-
-		$nodeIds = array_map(
-			function(Node $node) {
-				return $node->getNodeRef()->getUuid();
-			},
-			$nodesOfType
-		);
-
-		return $nodeIds; // uuid => nodeId
-	}
-
-	/**
-	 * Filters nodes by a given primary type qname
-	 *
-	 * @param Dictionary $nodes
-	 * @param string $primaryTypeQName
-	 *
-	 * @return array
-	 */
-	private function filterNodesByPrimaryType(Dictionary $nodes, $primaryTypeQName)
-	{
-		return array_filter(
-			$nodes->toArray(),
-			function(Node $node) use ($primaryTypeQName) {
-				return ($node->getTypeQName() == $primaryTypeQName);
-			}
-		);
-	}
-
-	/**
 	 * Build and execute query to return node data by type
 	 *
-	 * @param array $nodeUuids
-	 * @param array $typeStack
+	 * @param string[] $nodeUuids
+	 * @param NodeType[] $typeStack
+	 *
+	 * @throws \Exception If invalid property type is discovered
 	 *
 	 * @return array
 	 */
@@ -855,6 +811,7 @@ die(__FILE__.':'.__LINE__.PHP_EOL);
 		$anyProps = false;
 		$isRoot = true;
 		$rootTableKey = null;
+		$tableNameHelper = $this->getTableNameHelper();
 		/**
 		 * Build primary type query
 		 * @var int $ix
@@ -864,46 +821,60 @@ die(__FILE__.':'.__LINE__.PHP_EOL);
 
 			/** @var NodeTypeDef|NodeTypeRef $typeDef */
 			$typeDef = $type->getDef();
-			$tableKey = $this->getTableNameHelper()->getTableNameFromDef($typeDef);
+			$tableKey = $tableNameHelper->getTableKeyFromDef($typeDef);
 
 			$props = $typeDef->getProperties();
-			if (!$this->getTableNameHelper()->shouldDefHavePhysicalTable($typeDef)) continue;
+
+			if (!$tableNameHelper->shouldDefHavePhysicalTable($typeDef)) continue;
 			if (count($props) > 0) $anyProps = true;
-//			else continue;
+
 			$tableName = $cm->getTableName($tableKey);
 
-//			if ($typeDef instanceof NodeTypeRef) {
-				if ($isRoot) {
-					$qb->select($tableKey . '.node_uuid');
-					$qb->from($tableName, $tableKey);
-					$qb->where($tableKey . '.node_uuid IN (:uuid)');
-					$qb->setParameter(':uuid', $nodeUuids, Connection::PARAM_INT_ARRAY);
-					$rootTableKey = $tableKey;
-					$isRoot = false;
-				} else {
-					$qb->leftJoin(
-						$rootTableKey, //$typeStack[0]->getDef()->getTableKey(),
-						$tableName, //$typeDef->getTableKey(),
-						$tableKey, //$typeDef->getTableKey(),
-						$tableKey . '.node_uuid = ' . $rootTableKey . '.node_uuid AND ' . $tableKey . '.node_version = ' . $rootTableKey . '.node_version'
-					);
-				}
-				/** @var NodeTypePropertyDef $propertyDef */
-				foreach ($props as $propertyDef) {
-					if ($propertyDef->isMultiValued()) continue;
+			$uuidColumn = $tableNameHelper->getColumnName($tableKey, 'node_uuid');
+			$uuidAlias = $tableNameHelper->getColumnNameAlias($tableKey, 'node_uuid');
+			$versionColumn = $tableNameHelper->getColumnName($tableKey, 'node_version');
 
-					$propDataType = $this->getRepository()->getDictionaryService()->getDataType($propertyDef->getDataType());
-					if (null === $propDataType) throw new \Exception(sprintf('Invalid property type: %s', $propertyDef->getDataType()));
+			if ($isRoot) {
+				$qb->select(sprintf('%s AS %s', $uuidColumn, $uuidAlias));
+				$qb->from($tableName, $tableKey);
+				$qb->where($uuidColumn . ' IN (:uuid)');
+				$qb->setParameter(':uuid', $nodeUuids, Connection::PARAM_STR_ARRAY);
+				$rootTableKey = $tableKey;
+				$isRoot = false;
+			} else {
+				$rootUuidColumn = $tableNameHelper->getColumnName($rootTableKey, 'node_uuid');
+				$rootVersionColumn = $tableNameHelper->getColumnName($rootTableKey, 'node_version');
+				$qb->leftJoin(
+					$rootTableKey, //$typeStack[0]->getDef()->getTableKey(),
+					$tableName, //$typeDef->getTableKey(),
+					$tableKey, //$typeDef->getTableKey(),
+					$uuidColumn . ' = ' . $rootUuidColumn . ' AND ' . $versionColumn . ' = ' . $rootVersionColumn
+				);
+			}
+			/** @var NodeTypePropertyDef $propertyDef */
+			foreach ($props as $propertyDef) {
+				if ($propertyDef->isMultiValued()) continue;
 
-					$modelFields = $propDataType->getModelFields();
-					/** @var DataTypeModelField $modelField */
-					foreach ($modelFields as $modelField) {
-						$selectField = sprintf($propDataType->isSimpleStorage() ? '%s.%s' : '%s.%s_%s', $tableKey, $propertyDef->getKey(), $modelField->getName());
-						$selectAlias = sprintf($propDataType->isSimpleStorage() ? '%s__%s' : '%s__%s_%s', $tableKey, $propertyDef->getKey(), $modelField->getName());
-						$qb->addSelect(sprintf('%s AS %s', $selectField, $selectAlias));
-					}
+				$propDataType = $this->getRepository()->getDictionaryService()->getDataType($propertyDef->getDataType());
+				if (null === $propDataType) throw new \Exception(sprintf('Invalid property type: %s', $propertyDef->getDataType()));
+
+				$modelFields = $propDataType->getModelFields();
+				/** @var DataTypeModelField $modelField */
+				foreach ($modelFields as $modelField) {
+					$selectField = $tableNameHelper->getColumnName(
+						$tableKey,
+						$propertyDef->getKey(),
+						$propDataType->isSimpleStorage() ? null : $modelField->getName()
+						);
+					$selectAlias = $tableNameHelper->getColumnNameAlias(
+						$tableKey,
+						$propertyDef->getKey(),
+						$propDataType->isSimpleStorage() ? null : $modelField->getName()
+						);
+
+					$qb->addSelect(sprintf('%s AS %s', $selectField, $selectAlias));
 				}
-//			}
+			}
 		}
 
 		return $anyProps ? $qb->execute()->fetchAll() : [];

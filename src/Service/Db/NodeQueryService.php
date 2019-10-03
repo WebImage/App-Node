@@ -2,7 +2,9 @@
 
 namespace WebImage\Node\Service\Db;
 
+use Doctrine\DBAL\Connection;
 use WebImage\Core\Dictionary;
+use WebImage\Db\ConnectionManager;
 use WebImage\Node\Defs\NodeTypePropertyDef;
 use WebImage\Node\Entities\Node;
 use WebImage\Node\Properties\MultiValuePropertyValue;
@@ -15,6 +17,8 @@ use WebImage\Db\QueryBuilder As DbQueryBuilder;
 class NodeQueryService
 {
 	private $nodeService;
+	/** @var TableNameHelper */
+	private $tableNameHelper;
 
 	public function __construct(NodeService $nodeService)
 	{
@@ -30,29 +34,27 @@ class NodeQueryService
 	 */
 	public function query(Query $query)
 	{
-		$tables = [];
+		$qb = $this->getConnectionManager()->createQueryBuilder();
 
-		$cm = $this->nodeService->getConnectionManager();
-		$qb = $cm->createQueryBuilder();
-
-		$qb->select('n.*')->from('nodes', 'n'); // $search
-		$qb->where('n.status = :node_status');
-		$qb->setParameter(':node_status', NodeService::NODE_STATUS_ACTIVE);
+		$typeService = $this->getRepository()->getNodeTypeService();
+		$typeQNames = $query->getFilterTypeQNames();
+		$rootTableKey = $this->getTableNameHelper()->getRootTableKey($typeService, $typeQNames);
 
 		$this->configureSelect($qb, $query);
-		$this->configureJoins($qb, $query);
+		$this->configureTables($qb, $query);
 		$this->configureFilterAssociationValues($qb, $query);
 		$this->configureFilters($qb, $query);
 		$this->configureKeywords($qb, $query);
-		$this->configureFilterTypeQNames($qb, $query);
+		$this->configureFilterTypeQNames($qb, $query, $rootTableKey);
 		$this->configureSorts($qb, $query);
+		$this->configureStatus($qb, $query, $rootTableKey);
 
 		// Check if we need to paginate results:
 		if (null !== $query->getCurrentPage()) $qb->setFirstResult($query->getCurrentPage() * $query->getResultsPerPage() - $query->getResultsPerPage());
 		if (null !== $query->getResultsPerPage()) $qb->setMaxResults($query->getResultsPerPage());
 
 		$results = $qb->execute()->fetchAll();
-		$nodes = $this->convertResultsToNodes($results);
+		$nodes = $this->convertResultsToNodes($results, $rootTableKey);
 
 		return $nodes;
 	}
@@ -60,7 +62,7 @@ class NodeQueryService
 	/**
 	 * @return NodeService
 	 */
-	public function getNodeServices()
+	public function getNodeService()
 	{
 		return $this->nodeService;
 	}
@@ -70,16 +72,16 @@ class NodeQueryService
 	 */
 	public function getRepository()
 	{
-		return $this->getNodeServices()->getRepository();
+		return $this->getNodeService()->getRepository();
 	}
 
-	private function convertResultsToNodes(array $results)
+	private function convertResultsToNodes(array $results, string $rootTableKey)
 	{
 		$nodes = [];
 		$node = null;
 
 		foreach($results as $result) {
-			$node = $this->convertResultToNode($result);
+			$node = $this->convertResultToNode($result, $rootTableKey);
 			if (null === $node) continue;
 
 			$nodes[] = $node;
@@ -88,16 +90,21 @@ class NodeQueryService
 		return $nodes;
 	}
 
-	private function convertResultToNode(array $result)
+	private function convertResultToNode(array $result, string $rootTableKey)
 	{
 		$repository = $this->getRepository();
 		$dataService = $repository->getDataTypeService();
 		$typeService = $repository->getNodeTypeService();
+		$tableNameHelper = $this->getTableNameHelper();
 
-		$node = new Node($result['type_qname']);
+		$typeQNameColumn = $tableNameHelper->getColumnNameAlias($rootTableKey, 'type_qname');
+		$uuidColumn = $tableNameHelper->getColumnNameAlias($rootTableKey, 'node_uuid');
+		$versionColumn = $tableNameHelper->getColumnNameAlias($rootTableKey, 'node_version');
+
+		$node = new Node($result[$typeQNameColumn]);
 		$node->setRepository($repository);
 
-		$nodeRef = new NodeRef($result['uuid'], $result['version'], $result['node_id']);
+		$nodeRef = new NodeRef($result[$uuidColumn], $result[$versionColumn]);
 		$node->setNodeRef($nodeRef);
 
 		$type = $typeService->getNodeTypeByTypeQName($node->getTypeQName());
@@ -105,12 +112,13 @@ class NodeQueryService
 		if (null === $type) return;
 
 		$typeStack = $type->getTypeStack();
+		$columns = array_keys($result);
 
 		foreach($typeStack as $stackType) {
 
 			$typeDef = $stackType->getDef();
 
-			if (!($typeDef instanceof NodeTypeRef)) continue;
+//			if (!($typeDef instanceof NodeTypeRef)) continue;
 
 			$propertyDefs = $typeDef->getProperties();
 
@@ -119,25 +127,23 @@ class NodeQueryService
 				$propertyTableKey = null; // Defined below
 				$propertyKey = $propertyDef->getKey();
 
-				$propertyDataType = $dataService->getDataType($propertyDef->getQName());
+				$propertyDataType = $dataService->getDataType($propertyDef->getDataType());
 
 				/**
 				 * Get Property Definition Original Table
 				 */
-				$propertyDefTypeQName = $propertyDef->getNodeTypeQName();
+				$typeQName = $propertyDef->getNodeTypeQName();
+				$propParentType = $typeService->getNodeTypeByTypeQName($typeQName);
 
-				$propertyDefType = $typeService->getNodeTypeByTypeQName($propertyDefTypeQName);
+				if (null === $propParentType) continue;
 
-				if (null === $propertyDefType) continue;
+				$propParentTypeDef = $propParentType->getDef();
 
-				$propertyDefTypeDef = $propertyDefType->getDef();
-
-				// Make sure this is a database definition, because we need the getTableKey() method
-				$propertyTableKey = $propertyDefTypeDef->getTableKey();
-				$column = sprintf('%s_%s', $propertyTableKey, $propertyKey);
+				$propertyTableKey = $this->getTableNameHelper()->getTableKeyFromDef($propParentTypeDef);
+				$column = $tableNameHelper->getColumnNameAlias($propertyTableKey, $propertyKey);
 
 				if ($propertyDataType->isSimpleStorage()) {
-					if (isset($result[$column])) {
+					if (in_array($column, $columns)) { // isset($result[$column]) does not work for nulls
 						$property = null;
 
 						if ($propertyDef->isMultiValued()) {
@@ -151,7 +157,9 @@ class NodeQueryService
 						$node->addProperty($propertyKey, $property);
 					}
 				} else {
-					die(__FILE__.':'.__LINE__.PHP_EOL);
+
+					throw new \RuntimeException('Complext storage is not yet implemented');
+
 					$dataTypeModelFields = $propertyDataType->getModelFields();
 
 					$d = new Dictionary();
@@ -285,60 +293,72 @@ class NodeQueryService
 		 * Add fields
 		 */
 		$propertiesInfo = $this->getColumnsForProperties($query, $query->getProperties());
-		$colFormat = '%s.`%s` AS %1$s_%2$s';
+		$colFormat = '%s.`%s` AS %s';
 
-		if (count($propertiesInfo) > 0) {
-			foreach ($propertiesInfo as $propertyInfo) {
-				$tableKey = $propertyInfo['tableKey'];
+		if (count($propertiesInfo) > 0) throw new \RuntimeException('Selecting specific columns is not currently supported');
 
-				foreach ($propertyInfo['columns'] as $column) {
-					$qb->addSelect(sprintf($colFormat, $tableKey, $column));
-				}
-			}
-		} else {
-			/**
-			 * Add all fields from all tables
-			 */
-			$typeService = $this->getRepository()->getNodeTypeService();
-			// Add all columns to results
-			foreach($query->getFilterTypeQNames() as $typeQName) {
-				$type = $typeService->getNodeTypeByTypeQName($typeQName);
-				if ($type === null) throw new \RuntimeException(sprintf('Unknown type for filter type: %s', $typeQName));
-				$def = $type->getDef();
-				if (!($def instanceof NodeTypeRef)) continue; // Skip types that do not have table information
+		/**
+		 * Add all fields from all tables
+		 */
+		$typeService = $this->getRepository()->getNodeTypeService();
 
-				$tableKey = $def->getTableKey();
-				$properties = $def->getProperties();
-				/** @var NodeTypePropertyDef $property */
-				foreach($properties as $property) {
-					if ($property->isMultiValued()) continue;
+		// Add all columns to results
+		$uniqueColumns = [];
+		foreach($query->getFilterTypeQNames() as $typeQName) {
+
+			$type = $typeService->getNodeTypeByTypeQName($typeQName);
+			if ($type === null) throw new \RuntimeException(sprintf('Unknown type for filter type: %s', $typeQName));
+
+			foreach($type->getTypeStack() as $type) {
+				$tableKey = $this->getTableNameHelper()->getTableKeyFromDef($type->getDef());
+				if (!$this->getTableNameHelper()->shouldDefHavePhysicalTable($type->getDef())) continue;
+
+				foreach($type->getDef()->getProperties() as $property) {
+					if ($property->isMultiValued()) continue; // Multi-valued properties are handled elsewhere
+
 					$column = $property->getKey();
-					$qb->addSelect(sprintf($colFormat, $tableKey, $column));
+					$alias = $this->getTableNameHelper()->getColumnNameAlias($tableKey, $column);
+
+					// Ensure that a column only gets added once
+					if (!in_array($alias, $uniqueColumns)) {
+						$uniqueColumns[] = $alias;
+						$qb->addSelect(sprintf($colFormat, $tableKey, $column, $alias));
+					}
 				}
 			}
 		}
 	}
 
-	private function configureJoins(DbQueryBuilder $qb, Query $query)
+	private function configureTables(DbQueryBuilder $qb, Query $query)
 	{
 		$typeService = $this->getRepository()->getNodeTypeService();
 		$tables = [];
+
 		foreach($query->getFilterTypeQNames() as $typeQName) {
 			$type = $typeService->getNodeTypeByTypeQName($typeQName);
 			if (null === $type) {
 				echo 'NULL: ' . $typeQName .'<br>';
 				die(__FILE__.':'.__LINE__.PHP_EOL);
 			}
+
 			foreach($type->getTypeStack() as $type) {
-				$typeDef = $type->getDef();
-				if (!($typeDef instanceof NodeTypeRef)) continue;
-				$tables[] = $typeDef->getTableKey();
+				$tableKey = $this->getTableNameHelper()->getTableKeyFromDef($type->getDef());
+				if (!$this->getTableNameHelper()->shouldDefHavePhysicalTable($type->getDef())) continue;
+
+				$tables[] = $tableKey;
 			}
 		}
 
+		// Setup from table
+		$rootTableKey = array_shift($tables); // The first table is the "FROM"
+		$rootTableName = $this->getConnectionManager()->getTableName($rootTableKey);
+		$qb->from($rootTableName, $rootTableKey);
+
+		// Setup joins
 		foreach($tables as $tableKey) {
-			$joinConditions = sprintf('%s.node_id = n.node_id AND %1$s.node_version = n.version', $tableKey);
-			$qb->leftJoin('n', $tableKey, $tableKey, $joinConditions);
+			$joinConditions = sprintf('%s.node_uuid = %s.node_uuid AND %1$s.node_version = %1$s.node_version', $tableKey, $rootTableKey);
+			$tableName = $this->getConnectionManager()->getTableName($tableKey);
+			$qb->leftJoin($rootTableKey, $tableName, $tableKey, $joinConditions);
 		}
 	}
 
@@ -352,7 +372,7 @@ class NodeQueryService
 			$tableKey = 'node_assocs';
 			$tableAlias = 'node_assocs_' . $i;
 
-			$joinKeys = sprintf('%s.src_node_id = n.node_id AND %s.src_node_version = n.version', $tableAlias, $tableAlias);
+			$joinKeys = sprintf('%s.src_node_uuid = n.node_uuid AND %s.src_node_version = n.node_version', $tableAlias, $tableAlias);
 
 			$qb->join('n', $tableKey, $tableAlias, $joinKeys);
 
@@ -364,12 +384,12 @@ class NodeQueryService
 			die(__FILE__.':'.__LINE__.PHP_EOL);
 			if (is_array($associationValue)) { // Search for multiple values using an array of possible vlaues
 
-				$valueSearchField = new DAOSearchFieldValues($tableAlias, 'tgt_node_id', $associationValue);
+				$valueSearchField = new DAOSearchFieldValues($tableAlias, 'tgt_node_uuid', $associationValue);
 				// Since we are search multiple values, we should make sure that only distince Nodes are returned (since a Node could potentially match more than one associations and create duplicate results
 				$search->makeDistinct(true);
 
 			} else {
-				$valueSearchField = new DAOSearchField($tableAlias, 'tgt_node_id', $associationValue);
+				$valueSearchField = new DAOSearchField($tableAlias, 'tgt_node_uuid', $associationValue);
 			}
 
 			$search->addSearchField($valueSearchField);
@@ -432,19 +452,15 @@ class NodeQueryService
 		}
 	}
 
-	private function configureFilterTypeQNames(DbQueryBuilder $qb, Query $query)
+	private function configureFilterTypeQNames(DbQueryBuilder $qb, Query $query, string $rootTableKey)
 	{
 		// Filter search by type_names (e.g. {WebImage.Node.Types.Content)
 		if (count($query->getFilterTypeQNames()) > 0) {
-			$or = [];
+			$typeQNameColumn = $this->getTableNameHelper()->getColumnName($rootTableKey, 'type_qname');
 
-			foreach($query->getFilterTypeQNames() as $ix => $typeQName) {
-				$paramName = sprintf(':queryfiltertypeqname%d', $ix);
-				$or[] = sprintf('n.type_qname = %s', $paramName);
-				$qb->setParameter($paramName, $typeQName);
-			}
-
-			$qb->andWhere('(' . implode(' OR ', $or) . ')');
+			// @TODO Auto-include children of Type QNames
+			$qb->andWhere($typeQNameColumn . ' IN (:type_qname)');
+			$qb->setParameter(':type_qname', $query->getFilterTypeQNames(), Connection::PARAM_STR_ARRAY);
 		}
 	}
 
@@ -459,6 +475,13 @@ class NodeQueryService
 			}
 		}
 	}
+
+	private function configureStatus(DbQueryBuilder $qb, Query $query, string $rootTableKey)
+	{
+		$qb->andWhere($rootTableKey . ' .status = :node_status');
+		$qb->setParameter(':node_status', NodeService::NODE_STATUS_ACTIVE);
+	}
+
 	/**
 	 * Get the property definitions for the supplied objects
 	 *
@@ -528,7 +551,7 @@ class NodeQueryService
 
 				if (!$propertyDef->isMultiValued()) {
 
-					if ($dataType = $dataTypeService->getDataType($propertyDef->getQName())) {
+					if ($dataType = $dataTypeService->getDataType($propertyDef->getDataType())) {
 						if ($dataType->isSimpleStorage()) {
 							$propertyColumns->addColumn($propertyDef->getKey());
 						} else {
@@ -549,4 +572,27 @@ class NodeQueryService
 
 		return $columns;
 	}
+
+	/**
+	 * Create table helper
+	 *
+	 * @return TableNameHelper
+	 */
+	private function getTableNameHelper(): TableNameHelper
+	{
+		if (null === $this->tableNameHelper) $this->tableNameHelper = new TableNameHelper();
+
+		return $this->tableNameHelper;
+	}
+
+	/**
+	 * Convenience method to return ConnectionManager
+	 *
+	 * @return ConnectionManager
+	 */
+	private function getConnectionManager(): ConnectionManager
+	{
+		return $this->nodeService->getConnectionManager();
+	}
+
 }

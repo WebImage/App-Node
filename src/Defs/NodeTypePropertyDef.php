@@ -34,7 +34,7 @@ class NodeTypePropertyDef
 	/**
 	 * @var int
 	 */
-	private $sortorder;
+	private $sortorder = 0;
 	/**
 	 * @var string
 	 */
@@ -167,8 +167,10 @@ class NodeTypePropertyDef
 	}
 
 	// Dual purpose getters/setters
-	public function isRequired($trueFalse = null): bool
+	public function isRequired(): bool
 	{
+		if (func_num_args() > 0) throw new \InvalidArgumentException(sprintf('%s (%s) does not accept any arguments', __METHOD__, $this->getNodeTypeQName()));
+
 		return $this->isRequired;
 	}
 
@@ -179,6 +181,8 @@ class NodeTypePropertyDef
 
 	public function isMultiValued(): bool
 	{
+		if (func_num_args() > 0) throw new \InvalidArgumentException(sprintf('%s (%s) does not accept any arguments', __METHOD__, $this->getNodeTypeQName()));
+
 		return $this->isMultiValued;
 	}
 
@@ -189,6 +193,8 @@ class NodeTypePropertyDef
 
 	public function isReadOnly(): bool
 	{
+		if (func_num_args() > 0) throw new \InvalidArgumentException(sprintf('%s (%s) does not accept any arguments', __METHOD__, $this->getNodeTypeQName()));
+
 		return $this->readOnly;
 	}
 

@@ -267,8 +267,8 @@ class DictionaryService implements RepositoryAwareInterface
 		 */
 		foreach ($config->get('extensions', []) as $extension) {
 			$extension_def = self::processTypeOrExtension(self::$TYPE_EXTENSION, $extension);
-			$extension_def->isReadOnly(true); // Make sure that changes can't be made to these...
-			$extension_def->isFinal(true); // Extensions are not currently extendable
+			$extension_def->setReadOnly(true); // Make sure that changes can't be made to these...
+			$extension_def->setFinal(true); // Extensions are not currently extendable
 			$this->types->set($extension_def->getQName(), $extension_def);
 		}
 

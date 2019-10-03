@@ -80,21 +80,21 @@ return [
 
 	],
 	'extensions' => [
-		['name' => 'Ownable', 'pluralName' => 'Ownables', 'qname' => 'WebImage.Types.OwnableExtension', 'model' => ['name' => 'node_publishable']],
-		['name' => 'Authorable', 'pluralName' => 'Authorables', 'qname' => 'WebImage.Types.AuthorableExtension', 'associations' => [
-			[
-				'qname' => 'WebImage.Types.AuthorExtension',
-				'source' => [
-					'mandatory' => false,
-					'many' => true
-				],
-				'target' => [
-					'class' => 'WebImage.Types.Base',
-					'mandatory' => true,
-					'many' => true
-				]
-			]
-		]]
+//		['name' => 'Ownable', 'pluralName' => 'Ownables', 'qname' => 'WebImage.Types.OwnableExtension', 'model' => ['name' => 'node_publishable']],
+//		['name' => 'Authorable', 'pluralName' => 'Authorables', 'qname' => 'WebImage.Types.AuthorableExtension', 'associations' => [
+//			[
+//				'qname' => 'WebImage.Types.AuthorExtension',
+//				'source' => [
+//					'mandatory' => false,
+//					'many' => true
+//				],
+//				'target' => [
+//					'class' => 'WebImage.Types.Base',
+//					'mandatory' => true,
+//					'many' => true
+//				]
+//			]
+//		]]
 	],
 	'dataTypes' => [
 		['type' => 'WebImage.DataTypes.String', 'name' => 'Single Line', 'formElement' => 'text', 'phpType' => 'string', 'modelField' => ['type' => Type::STRING, 'options' => ['length' => 255]]],

@@ -103,7 +103,7 @@ class Node extends AbstractRepositoryEntity {
 	/**
 	 * Get the properties associated with the node
 	 *
-	 * @return array
+	 * @return PropertyInterface[]|SingleValuePropertyInterface[]|MultiValuePropertyInterface[]
 	 */
 	public function getProperties()
 	{
