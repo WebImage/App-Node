@@ -8,16 +8,12 @@ use WebImage\Node\Service\NodeServiceInterface;
 
 class QueryBuilder
 {
-	/**
-	 * @var Dictionary
-	 */
+	/** @var Dictionary */
 	private $aliases;
-	/**
-	 * @var NodeServiceInterface
-	 */
-	private $nodeService;
 	/** @var Query */
 	private $query;
+	/** @var NodeServiceInterface */
+	private $nodeService;
 
 	public function __construct(NodeServiceInterface $nodeService)
 	{

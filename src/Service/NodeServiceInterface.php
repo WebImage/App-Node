@@ -60,7 +60,7 @@ interface NodeServiceInterface extends RepositoryAwareInterface
 	 *
 	 * @return mixed
 	 */
-	public function saveNodeRef($typeQName, NodeRefInterface $ref);
+//	public function saveNodeRef($typeQName, NodeRefInterface $ref);
 
 	/**
 	 * Save a node association

@@ -18,7 +18,7 @@ class NodeType extends AbstractRepositoryEntity
 	 * @throws Exception
 	 * @throws RuntimeException
 	 *
-	 * @return NodeType
+	 * @return NodeType[]
 	 */
 	public function getParents()
 	{
@@ -153,6 +153,10 @@ class NodeType extends AbstractRepositoryEntity
 		return $def;
 	}
 
+	/**
+	 * Retrieves a fresh copy of the underlying Node.  Should not cache, as the underlying Node may have changed and needs to be refreshed.
+	 * @return null|Node
+	 */
 	public function getNode()
 	{
 		return $this->getRepository()->getNodeService()->getNodeByUuid($this->getDef()->getUuid());

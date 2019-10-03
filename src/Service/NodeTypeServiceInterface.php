@@ -120,5 +120,5 @@ interface NodeTypeServiceInterface extends RepositoryAwareInterface {
 	 *
 	 * @return NodeTypePropertyDef
 	 */
-	public function createPropertyDef($qnameStr, $key, $name, $type, $required, $default, $isMultiValued, $sortorder, Config $config=null);
+	public function createPropertyDef(string $nodeTypeQName, string $key, string $name, string $dataType, bool $required = false, $default = null, bool $isMultiValued = false, int $sortorder = null, Config $config = null);
 }
