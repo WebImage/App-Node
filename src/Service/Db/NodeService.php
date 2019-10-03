@@ -52,9 +52,9 @@ class NodeService implements NodeServiceInterface
 
 		$this->insertRecord('node_associations', [
 			'assoc_qname' => $association->getQName(),
-			'src_node_id' => $srcRef->getNodeId(),
+			'src_node_uuid' => $srcRef->getUuid(),
 			'src_node_version' => $srcRef->getVersion(),
-			'tgt_node_id' => $tgtRef->getNodeId(),
+			'tgt_node_uuid' => $tgtRef->getUuid(),
 			'tgt_node_version' => $tgtRef->getVersion(),
 			'sortorder' => $sortorder
 		]);
@@ -67,15 +67,15 @@ class NodeService implements NodeServiceInterface
 			->select('MAX(sortorder) AS sortorder')
 			->from('node_associations')
 			->where('assoc_qname = :assoc_qname')
-			->andWhere('src_node_id = :src_node_id')
+			->andWhere('src_node_uuid = :src_node_uuid')
 			->andWhere('src_node_version = :src_node_version')
-			->andWhere('tgt_node_id = :tgt_node_id')
+			->andWhere('tgt_node_uuid = :tgt_node_uuid')
 			->andWhere('tgt_node_version = :tgt_node_version')
 			->setParameters([
 				'assoc_qname' => $assoc->getQName(),
-				'src_node_id' => $srcRef->getNodeId(),
+				'src_node_uuid' => $srcRef->getUuid(),
 				'src_node_version' => $srcRef->getVersion(),
-				'tgt_node_id' => $tgtRef->getNodeId(),
+				'tgt_node_uuid' => $tgtRef->getUuid(),
 				'tgt_node_version' => $tgtRef->getVersion(),
 			])
 			->execute()
@@ -124,8 +124,8 @@ class NodeService implements NodeServiceInterface
 		$qb = $this->getConnectionManager()->createQueryBuilder();
 		$count = $qb->select('COUNT(*)')
 			->from('node_associations', 'a')
-			->join('a', 'nodes', 'n', 'n.node_id = a.src_node_id')
-			->join('n', 'node_types', 't', 't.node_id = n.node_id')
+			->join('a', 'nodes', 'n', 'n.node_uuid = a.src_node_uuid')
+			->join('n', 'node_types', 't', 't.node_uuid = n.node_uuid')
 			->where('a.assoc_qname = :assoc_qname AND t.qname IN (:qnames)')
 			->setParameter(':assoc_qname', $typeAssocDef->getQName())
 			->setParameter(':qnames', $typeQNames, Connection::PARAM_STR_ARRAY)
@@ -161,23 +161,6 @@ class NodeService implements NodeServiceInterface
 		throw new \RuntimeException(sprintf('Nodes of type %s are not allowed in the association %s', $node->getTypeQName(), $assocQName));
 	}
 
-	public function saveNodeRef($typeQName, NodeRefInterface $nodeRef)
-	{
-		throw new \Exception(sprintf('%s not yet implemented', __METHOD__));
-
-		$odeStruct = new NodeStruct();
-		$odeStruct->type_qname = $typeQName;
-		$odeStruct->uuid = $nodeRef->getUuid();
-		$odeStruct->version = $nodeRef->getNodeVersion();
-		NodeLogic::save($odeStruct);
-
-		#$nodeRef = new NodeRef($node_struct->uuid, $node_struct->version, $node_struct->node_id);
-		// Update any required values from the save operation
-		$nodeRef->setNodeId($odeStruct->node_id);
-
-		return $nodeRef;
-	}
-
 	/**
 	 * @inheritdoc
 	 */
@@ -209,31 +192,56 @@ class NodeService implements NodeServiceInterface
 		$types[] = $nodeType;
 //		array_shift($types); // Remove base: nodes
 
-		$createdBy = $node->getPropertyValue('created_by');
-		$created = $node->getPropertyValue('created');
-
 		// Make sure created as an actual value, otherwise set it to null so that the DataAccessObject will know to auto-set its date
 		if (empty($created)) $created = null;
 
 		if ($new_node) {
 
 			$qb = $this->getConnectionManager()->createQueryBuilder();
-echo 'Name: ' . $node->getPropertyValue('name') . '<br>';die(__FILE__.':'.__LINE__.PHP_EOL);
 
-			$data = [
-				'type_qname' => $nodeType->getDef()->getQName(),
-				'created' => $created,
-				'created_by' => $createdBy,
-				'uuid' => Uuid::v4(),
-				'version' => 1
-			];
+			$root = null;
+			$rootTypeKey = null;
+
+			foreach($types as $type) {
+				if (!$this->getTableNameHelper()->shouldDefHavePhysicalTable($type->getDef())) continue;
+				$typeTable = $this->getTableNameHelper()->getTableNameFromDef($type->getDef());
+
+				$root = $type;
+				$rootTableKey = $typeTable;
+				break; // If we made it here, we're good
+			}
+
+			if (null === $root) throw new \RuntimeException('Unable to find node root table');
+
+			$node->setPropertyValue('node_uuid', Uuid::v4());
+			$node->setPropertyValue('created', date('Y-m-d H:i:s'));
+			$node->setPropertyValue('updated', date('Y-m-d H:i:s'));
+			$node->setPropertyValue('type_qname', $nodeType->getDef()->getQName());
+			$data = [];
+
+			foreach($root->getDef()->getProperties() as $key => $property) {
+				$data[$key] = $node->getPropertyValue($key);
+			}
+
+//			$data = [
+//				'type_qname' => $nodeType->getDef()->getQName(),
+//				'created' => $created,
+//				'created_by' => $createdBy,
+//				'node_uuid' => Uuid::v4(),
+//				'node_version' => 1,
+//			];
+//
+//			echo 'Name: ' . $node->getPropertyValue('name') . '<br>';
+//			echo 'Type: ' . $nodeType->getDef()->getQName() . '<br>';
+//			echo '<pre>';print_r($nodeType->getDef());echo '<hr />' . __FILE__ .':'.__LINE__;exit;
+//			echo '<pre>';print_r($data);echo '<hr />' . __FILE__ .':'.__LINE__;exit;
 
 			$qb->insert('nodes')
 				->values(array_map(function() { return '?'; }, $data))
 				->setParameters(array_values($data))
 				->execute();
 
-			$nodeRef = new NodeRef($data['uuid'], $data['version'], $qb->getConnection()->lastInsertId());
+			$nodeRef = new NodeRef($data['node_uuid'], $data['node_version'], $qb->getConnection()->lastInsertId());
 			$node->setNodeRef($nodeRef);
 
 		} else {
@@ -268,16 +276,16 @@ echo 'Name: ' . $node->getPropertyValue('name') . '<br>';die(__FILE__.':'.__LINE
 			foreach($properties as $fieldName => $propertyDef) {
 
 				// Check if this should be considered a primary key
-				if (in_array($fieldName, array('node_id', 'version'/*, 'profile', 'locale'*/))) {
+				if (in_array($fieldName, array('node_uuid', 'node_version'/*, 'profile', 'locale'*/))) {
 
 					$primaryKeys[] = $fieldName;
 
 					switch ($fieldName) {
-						case 'node_id':
-							$typeData['node_id'] = $nodeRef->getNodeId();
+						case 'node_uuid':
+							$typeData['node_uuid'] = $nodeRef->getUuid();
 							break;
-						case 'version':
-							$typeData['version'] = $nodeRef->getVersion();
+						case 'node_version':
+							$typeData['node_version'] = $nodeRef->getVersion();
 							break;
 //						case 'profile': // Not currently supported, so just assume that it applies to <all>
 //							if ($property_profile = $node->getProperty('profile')) $typeData['profile'] = $property_profile->getValue();
@@ -292,7 +300,7 @@ echo 'Name: ' . $node->getPropertyValue('name') . '<br>';die(__FILE__.':'.__LINE
 					/** @var Property|MultiValueProperty $property */
 					$property = $node->getProperty($fieldName);
 
-					$propertyType = $propertyDef->getQName();
+					$propertyType = $propertyDef->getDataType();
 
 					$dataType = $this->getRepository()->getDataTypeService()->getDataType($propertyType);
 					if (null === $dataType) {
@@ -314,9 +322,9 @@ echo 'Name: ' . $node->getPropertyValue('name') . '<br>';die(__FILE__.':'.__LINE
 
 						$existingValues = $qb->select('*')
 							->from($propertyTableKey)
-							->where('node_id = :nodeid')
+							->where('node_uuid = :node_uuid')
 							->setParameters([
-								':nodeid' => $nodeRef->getNodeId()
+								':node_uuid' => $nodeRef->getUuid()
 //								':version' => $nodeRef->getVersion()
 							])
 							->execute()
@@ -374,11 +382,11 @@ echo 'Name: ' . $node->getPropertyValue('name') . '<br>';die(__FILE__.':'.__LINE
 //								$qb->insert($propertyTableKey)
 //									->values(['']
 								$propertyData = [
-									'node_id' => ':nodeid',
+									'node_uuid' => ':node_uuid',
 									'node_version' => ':version'
 								];
 								$propertyParams = [
-									':nodeid' => $nodeRef->getNodeId(),
+									':node_uuid' => $nodeRef->getUuid(),
 									':version' => $nodeRef->getVersion()
 								];
 
@@ -464,11 +472,11 @@ die(__FILE__.':'.__LINE__.PHP_EOL);
 			$qb->select('COUNT(*) AS total')
 				->from($tableKey);
 
-			// Make sure that at a minimum, node_id and version are defined as primary keys
+			// Make sure that at a minimum, node_uuid and version are defined as primary keys
 			if (count($primaryKeys) == 0) {
-				$typeData['node_id'] = $nodeRef->getNodeId();
+				$typeData['node_uuid'] = $nodeRef->getUuid();
 				$typeData['node_version'] = $nodeRef->getVersion();
-				$primaryKeys = array('node_id', 'node_version');
+				$primaryKeys = array('node_uuid', 'node_version');
 			}
 
 			foreach ($primaryKeys as $primaryKey) {
@@ -526,31 +534,10 @@ die(__FILE__.':'.__LINE__.PHP_EOL);
 
 		$qb->update('nodes')
 			->set('status', ':status')
-			->where('uuid = :uuid')
+			->where('node_uuid = :uuid')
 			->setParameter(':status', self::NODE_STATUS_DELETED)
 			->setParameter(':uuid', $node->getNodeRef()->getUuid())
 			->execute();
-	}
-
-	private function _getNodeIdValue($node)
-	{
-		return $node->getNodeRef()->getNodeId();
-	}
-
-	private function _getDateValue($node, $format)
-	{
-		$created = strtotime($node->getPropertyValue('created'));
-		return CWI_STRING_Helper::strToSefKey(date($format, $created));
-	}
-
-	private function _getNodeTitleValue($node)
-	{
-		return CWI_STRING_Helper::strToSefKey($node->getPropertyValue('title'));
-	}
-
-	private function _getNodeTypeNameValue($nodeType)
-	{
-		return CWI_STRING_Helper::strToSefKey($nodeType->getDef()->getName());
 	}
 
 	/**
@@ -605,13 +592,12 @@ die(__FILE__.':'.__LINE__.PHP_EOL);
 	public function getNodesByUuids(array $uuids)
 	{
 		$nodes = new Dictionary(); // [uuid] => Node
-		$nodeUuidLookup = new Dictionary(); // [nodeId] => uuid
 
 		$qb = $this->getConnectionManager()->createQueryBuilder();
 
 		$nodesData = $qb->select('*')
 			->from('nodes')
-			->where('uuid IN (:uuid) AND status = :status')
+			->where('node_uuid IN (:uuid) AND status = :status')
 			->setParameter(':uuid', $uuids, Connection::PARAM_STR_ARRAY)
 			->setParameter(':status', self::NODE_STATUS_ACTIVE)
 			->execute()
@@ -623,7 +609,7 @@ die(__FILE__.':'.__LINE__.PHP_EOL);
 
 			// Build Node
 			$node = new Node($nodeData['type_qname']);
-			$nodeRef = new NodeRef($nodeData['uuid'], $nodeData['version'], $nodeData['node_id']);
+			$nodeRef = new NodeRef($nodeData['node_uuid'], $nodeData['node_version']);
 			$node->setNodeRef($nodeRef);
 			$node->setRepository($this->getRepository());
 
@@ -642,15 +628,9 @@ die(__FILE__.':'.__LINE__.PHP_EOL);
 			}
 
 			$nodes->set($node->getNodeRef()->getUuid(), $node);
-			$nodeUuidLookup->set(
-				$node->getNodeRef()->getNodeId(),
-				$node->getNodeRef()->getUuid()
-			);
-
-			///////////// CONTINUE HERE //////////////
 		}
 
-		$this->addPropertiesToNode($nodes, $nodeUuidLookup, $allTypeQNames);
+		$this->addPropertiesToNode($nodes, $allTypeQNames);
 
 		return $nodes;
 	}
@@ -661,42 +641,28 @@ die(__FILE__.':'.__LINE__.PHP_EOL);
 	 * @param Dictionary $nodes Dictionary<string, Node>
 	 * @param Dictionary $allTypeQNames<string, NodeType[]>
 	 */
-	private function addPropertiesToNode(Dictionary $nodes, Dictionary $nodeUuidLookup, Dictionary $allTypeQNames)
+	private function addPropertiesToNode(Dictionary $nodes, Dictionary $allTypeQNames)
 	{
 		/**
 		 * Iterate through primary node types and build query
 		 * @var string $typeQName
 		 * @var NodeType[] $typeStack
 		 */
-		try {
-			foreach ($allTypeQNames as $typeQName => $typeStack) {
-				echo 'TYPE: ' . $typeQName . '<br>';
-				$this->addSimpleNodeProperties($nodes, $nodeUuidLookup, $typeStack);
-				$this->addMultiNodeProperties($nodes, $nodeUuidLookup, $typeStack);
-			}
-		} catch (\PDOException $e) {
-			die(__FILE__ . ':' . __LINE__ . PHP_EOL);
-		} catch (PDOException $e) {
-			die(__FILE__.':'.__LINE__.PHP_EOL);
-		} catch (\Doctrine\DBAL\Exception\SyntaxErrorException $e) {
-			foreach($e->getTrace() as $data) {
-				if (!isset($count)) $count = 0;
-				echo ++$count . ') ' . $data['file'] . ':' . $data['line'] . '<br>';
-			}
-			die(__FILE__.':'.__LINE__.PHP_EOL);
+		foreach ($allTypeQNames as $typeQName => $typeStack) {
+			$this->addSimpleNodeProperties($nodes, $typeStack);
+			$this->addMultiNodeProperties($nodes, $typeStack);
 		}
 	}
 
 	/**
 	 * @param Dictionary $nodes
-	 * @param Dictionary $nodeUuidLookup
 	 * @param array $typeStack
 	 *
 	 * @todo Convert multi properties to be lazy loading?
 	 */
-	private function addMultiNodeProperties(Dictionary $nodes, Dictionary $nodeUuidLookup, array $typeStack)
+	private function addMultiNodeProperties(Dictionary $nodes, array $typeStack)
 	{
-		$nodeIds = $nodeUuidLookup->keys();
+		$uuids = $nodes->keys();
 
 		/** @var NodeType $type */
 		foreach($typeStack as $type) {
@@ -708,14 +674,14 @@ die(__FILE__.':'.__LINE__.PHP_EOL);
 				if (!$propertyDef->isMultiValued()) continue;
 
 				$propertyTableKey = $typeDef->getTableKey() . '_p_' . $propertyDef->getKey();
-				$dataType = $this->getRepository()->getDataTypeService()->getDataType($propertyDef->getQName());
+				$dataType = $this->getRepository()->getDataTypeService()->getDataType($propertyDef->getDataType());
 
 				$qb = $this->getConnectionManager()
 					->createQueryBuilder()
-					->select('node_id')
+					->select('node_uuid')
 					->from($propertyTableKey)
-					->where('node_id IN (:nodeid)')
-					->setParameter(':nodeid', $nodeIds, Connection::PARAM_INT_ARRAY);
+					->where('node_uuid IN (:uuid)')
+					->setParameter(':uuid', $uuids, Connection::PARAM_STR_ARRAY);
 
 				$propertyKey = $propertyDef->getKey();
 
@@ -731,7 +697,7 @@ die(__FILE__.':'.__LINE__.PHP_EOL);
 				$results = $qb->execute()->fetchAll();
 
 				foreach($results as $result) {
-					$uuid = $nodeUuidLookup->get($result['node_id']);
+					$uuid = $result['node_uuid'];
 
 					/** @var Node $node */
 					$node = $nodes->get($uuid);
@@ -758,18 +724,16 @@ die(__FILE__.':'.__LINE__.PHP_EOL);
 	 * Add primary properties that are related to non multi-value property
 	 *
 	 * @param Dictionary $nodes Dictionary<string, Node>
-	 * @param Dictionary $nodeUuidLookup Dictionary<id:int, uuid:string>
 	 * @param Type[] $typeStack
 	 */
-	private function addSimpleNodeProperties(Dictionary $nodes, Dictionary $nodeUuidLookup, array $typeStack)
+	private function addSimpleNodeProperties(Dictionary $nodes, array $typeStack)
 	{
-		$nodeIds = $this->extractNodeIdsForPrimaryType($nodes, $typeStack[0]->getDef()->getQName());
-
-		$results = $this->getNodeDataResultsForTypes($nodeIds, $typeStack);
+		$nodeUuids = $this->extractNodeUuidsForPrimaryType($nodes, $typeStack[0]->getDef()->getQName());
+		$results = $this->getNodeDataResultsForTypes($nodeUuids, $typeStack);
 
 		foreach($results as $result) {
 
-			$uuid = $nodeUuidLookup->get($result['node_id']);
+			$uuid = $result['node_uuid'];
 			/** @var Node $node */
 			$node = $nodes->get($uuid);
 
@@ -791,7 +755,7 @@ die(__FILE__.':'.__LINE__.PHP_EOL);
 
 					} else {
 
-						$dataType = $this->getRepository()->getDataTypeService()->getDataType($propertyDef->getQName());
+						$dataType = $this->getRepository()->getDataTypeService()->getDataType($propertyDef->getDataType());
 
 						$resultKey = sprintf('%s__%s', $typeDef->getTableKey(), $propertyDef->getKey());
 
@@ -844,13 +808,13 @@ die(__FILE__.':'.__LINE__.PHP_EOL);
 	 *
 	 * @return array
 	 */
-	private function extractNodeIdsForPrimaryType(Dictionary $nodes, $primaryTypeQName)
+	private function extractNodeUuidsForPrimaryType(Dictionary $nodes, $primaryTypeQName)
 	{
 		$nodesOfType = $this->filterNodesByPrimaryType($nodes, $primaryTypeQName);
 
 		$nodeIds = array_map(
 			function(Node $node) {
-				return $node->getNodeRef()->getNodeId();
+				return $node->getNodeRef()->getUuid();
 			},
 			$nodesOfType
 		);
@@ -879,16 +843,18 @@ die(__FILE__.':'.__LINE__.PHP_EOL);
 	/**
 	 * Build and execute query to return node data by type
 	 *
-	 * @param array $nodeIds
+	 * @param array $nodeUuids
 	 * @param array $typeStack
 	 *
 	 * @return array
 	 */
-	private function getNodeDataResultsForTypes(array $nodeIds, array $typeStack)
+	private function getNodeDataResultsForTypes(array $nodeUuids, array $typeStack)
 	{
-		$qb = $this->getConnectionManager()->createQueryBuilder();
+		$cm = $this->getConnectionManager();
+		$qb = $cm->createQueryBuilder();
 		$anyProps = false;
-
+		$isRoot = true;
+		$rootTableKey = null;
 		/**
 		 * Build primary type query
 		 * @var int $ix
@@ -898,47 +864,48 @@ die(__FILE__.':'.__LINE__.PHP_EOL);
 
 			/** @var NodeTypeDef|NodeTypeRef $typeDef */
 			$typeDef = $type->getDef();
+			$tableKey = $this->getTableNameHelper()->getTableNameFromDef($typeDef);
 
 			$props = $typeDef->getProperties();
+			if (!$this->getTableNameHelper()->shouldDefHavePhysicalTable($typeDef)) continue;
 			if (count($props) > 0) $anyProps = true;
+//			else continue;
+			$tableName = $cm->getTableName($tableKey);
 
-			if ($typeDef instanceof NodeTypeRef) {
-				if ($ix == 0) {
-					$qb->select($typeDef->getTableKey() . '.node_id');
-					$qb->from($typeDef->getTableKey(), $typeDef->getTableKey());
-					$qb->where($typeDef->getTableKey() . '.node_id IN (:nodeid)');
-					$qb->setParameter(':nodeid', $nodeIds, Connection::PARAM_INT_ARRAY);
+//			if ($typeDef instanceof NodeTypeRef) {
+				if ($isRoot) {
+					$qb->select($tableKey . '.node_uuid');
+					$qb->from($tableName, $tableKey);
+					$qb->where($tableKey . '.node_uuid IN (:uuid)');
+					$qb->setParameter(':uuid', $nodeUuids, Connection::PARAM_INT_ARRAY);
+					$rootTableKey = $tableKey;
+					$isRoot = false;
 				} else {
 					$qb->leftJoin(
-						$typeStack[0]->getDef()->getTableKey(),
-						$typeDef->getTableKey(),
-						$typeDef->getTableKey(),
-						$typeDef->getTableKey() . '.node_id = ' . $typeStack[0]->getDef()->getTableKey() . '.node_id AND ' . $typeDef->getTableKey() . '.node_version = ' . $typeStack[0]->getDef()->getTableKey() . '.node_version'
+						$rootTableKey, //$typeStack[0]->getDef()->getTableKey(),
+						$tableName, //$typeDef->getTableKey(),
+						$tableKey, //$typeDef->getTableKey(),
+						$tableKey . '.node_uuid = ' . $rootTableKey . '.node_uuid AND ' . $tableKey . '.node_version = ' . $rootTableKey . '.node_version'
 					);
 				}
 				/** @var NodeTypePropertyDef $propertyDef */
 				foreach ($props as $propertyDef) {
 					if ($propertyDef->isMultiValued()) continue;
 
-					$propDataType = $this->getRepository()->getDictionaryService()->getDataType($propertyDef->getQName());
-					if (null === $propDataType) throw new \Exception(sprintf('Invalid property type: %s', $propertyDef->getQName()));
+					$propDataType = $this->getRepository()->getDictionaryService()->getDataType($propertyDef->getDataType());
+					if (null === $propDataType) throw new \Exception(sprintf('Invalid property type: %s', $propertyDef->getDataType()));
 
 					$modelFields = $propDataType->getModelFields();
 					/** @var DataTypeModelField $modelField */
 					foreach ($modelFields as $modelField) {
-						$selectField = sprintf($propDataType->isSimpleStorage() ? '%s.%s' : '%s.%s_%s', $typeDef->getTableKey(), $propertyDef->getKey(), $modelField->getName());
-						$selectAlias = sprintf($propDataType->isSimpleStorage() ? '%s__%s' : '%s__%s_%s', $typeDef->getTableKey(), $propertyDef->getKey(), $modelField->getName());
+						$selectField = sprintf($propDataType->isSimpleStorage() ? '%s.%s' : '%s.%s_%s', $tableKey, $propertyDef->getKey(), $modelField->getName());
+						$selectAlias = sprintf($propDataType->isSimpleStorage() ? '%s__%s' : '%s__%s_%s', $tableKey, $propertyDef->getKey(), $modelField->getName());
 						$qb->addSelect(sprintf('%s AS %s', $selectField, $selectAlias));
 					}
 				}
-//			} else {
-//				echo '<pre>';print_r($typeDef);echo '<hr />' . __FILE__ .':'.__LINE__;exit;
-			}
+//			}
 		}
-if ($anyProps) {
-	echo $qb->getSQL() . '<br>';
-	exit;
-}
+
 		return $anyProps ? $qb->execute()->fetchAll() : [];
 	}
 
@@ -963,7 +930,6 @@ if ($anyProps) {
 
 	public function getAssociationDef($assocTypeQNname)
 	{
-
 		// Create the database entry
 		if ($assoc_def_struct = NodeAssociationLogic::getNodeAssociationDef($assocTypeQNname)) {
 
@@ -1002,12 +968,12 @@ if ($anyProps) {
 		$association->setRepository($this->getRepository());
 
 		// Check if the association already exists, if not create it
-//		if (!$assoc_struct = NodeAssociationLogic::getNodeAssociation($assocQName, $srcRef->getNodeId(), $srcRef->getNodeVersion(), $dstRef->getNodeId(), $dstRef->getNodeVersion())) {
+//		if (!$assoc_struct = NodeAssociationLogic::getNodeAssociation($assocQName, $srcRef->getUuid(), $srcRef->getNodeVersion(), $dstRef->getUuid(), $dstRef->getNodeVersion())) {
 //			$assoc_struct = NodeAssociationLogic::createNodeAssociation(
 //				$assocQName,
-//				$srcRef->getNodeId(),
+//				$srcRef->getUuid(),
 //				$srcRef->getNodeVersion(),
-//				$dstRef->getNodeId(),
+//				$dstRef->getUuid(),
 //				$dstRef->getNodeVersion()
 //			);
 //		}
@@ -1030,9 +996,9 @@ if ($anyProps) {
 
 		$where = [
 			'assoc_qname' => $assocQName,
-			'src_node_id' => $srcRef->getNodeId(),
+			'src_node_uuid' => $srcRef->getUuid(),
 			'src_node_version' => $srcRef->getVersion(),
-			'tgt_node_id' => $tgtRef->getNodeId(),
+			'tgt_node_uuid' => $tgtRef->getUuid(),
 			'tgt_node_version' => $tgtRef->getVersion()
 		];
 
@@ -1053,17 +1019,17 @@ if ($anyProps) {
 
 		$nodeRefsData = $this->getConnectionManager()
 			->createQueryBuilder()
-			->select('n.node_id, n.uuid, n.version')
+			->select('n.node_uuid, n.node_version')
 			->from('node_associations', 'a')
-			->join('a', 'nodes', 'n', 'n.node_id = a.tgt_node_id AND n.version = a.tgt_node_version')
-			->where('a.src_node_id = :id AND a.src_node_version = :version')
-			->setParameter(':id', $ref->getNodeId())
+			->join('a', 'nodes', 'n', 'n.node_uuid = a.tgt_node_uuid AND n.node_version = a.tgt_node_version')
+			->where('a.src_node_uuid = :uuid AND a.src_node_version = :version')
+			->setParameter(':uuid', $ref->getUuid())
 			->setParameter(':version', $ref->getVersion())
 			->execute()
 			->fetchAll();
 
 		return array_map(function($data) {
-			return new NodeRef($data['uuid'], $data['version'], $data['node_id']);
+			return new NodeRef($data['node_uuid'], $data['node_version']);
 		}, $nodeRefsData);
 	}
 
@@ -1143,14 +1109,14 @@ if ($anyProps) {
 		#$refs = $this->getAssociatedNodeRefs($node, '{http://www.ivn.us/nodeassociation}assoc-placement');
 		#$refs = $this->getAssociatedNodeRefs($node);
 
-		$rs_associations = NodeAssociationLogic::getNodeAssociations(null, $node->getNodeRef()->getNodeId(), $node->getNodeRef()->getNodeVersion());
+		$rs_associations = NodeAssociationLogic::getNodeAssociations(null, $node->getNodeRef()->getUuid(), $node->getNodeRef()->getNodeVersion());
 
 		$xml_association_group = new CWI_XML_Traversal('associationGroup');
 
 		while ($association = $rs_associations->getNext()) {
 
-			$src_node_ref = new NodeRef($association->src_node_uuid, $association->src_node_version, $association->src_node_id);
-			$tgt_node_ref = new NodeRef($association->tgt_node_uuid, $association->tgt_node_version, $association->tgt_node_id);
+			$src_node_ref = new NodeRef($association->src_node_uuid, $association->src_node_version, $association->src_node_uuid);
+			$tgt_node_ref = new NodeRef($association->tgt_node_uuid, $association->tgt_node_version, $association->tgt_node_uuid);
 			#$return->add($nodeRef);
 
 			$xml_source = new CWI_XML_Traversal('source');
@@ -1176,5 +1142,10 @@ if ($anyProps) {
 		$exporter->setNodeAssociationXmlTraversal($uuid, $version, $xml_association_group);
 
 		return $xml_association_group;
+	}
+
+	private function getTableNameHelper(): TableNameHelper
+	{
+		return new TableNameHelper();
 	}
 }
