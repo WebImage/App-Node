@@ -16,13 +16,13 @@ return [
 			'isAbstract' => true,
 			'properties' => [
 				['key' => 'name', 'name' => 'Name', 'searchable' => true, 'type' => 'WebImage.DataTypes.String'],
-				['key' => 'created', 'name' => 'Created', 'type' => 'WebImage.DataTypes.DateTime', 'isReadOnly' => true],
+				['key' => 'created', 'name' => 'Created', 'type' => 'WebImage.DataTypes.DateTime', 'isReadOnly' => true, 'required' => true],
 				['key' => 'created_by', 'name' => 'Created By', 'type' => 'WebImage.DataTypes.Integer', 'isReadOnly' => true],
-				['key' => 'status', 'name' => 'Status', 'type' => 'WebImage.DataTypes.String', 'isReadOnly' => true],
-				['key' => 'type_qname', 'name' => 'Type QName', 'type' => 'WebImage.DataTypes.String', 'isReadOnly' => true],
-				['key' => 'uuid', 'name' => 'UUID', 'type' => 'WebImage.DataTypes.String', 'isReadOnly' => true],
-				['key' => 'version', 'name' => 'Version', 'type' => 'WebImage.DataTypes.Integer', 'isReadOnly' => true],
-				['key' => 'updated', 'name' => 'Updated', 'type' => 'WebImage.DataTypes.DateTime', 'isReadOnly' => true],
+				['key' => 'status', 'name' => 'Status', 'type' => 'WebImage.DataTypes.String', 'isReadOnly' => true, 'required' => true, 'default' => 'A'],
+				['key' => 'type_qname', 'name' => 'Type QName', 'type' => 'WebImage.DataTypes.String', 'isReadOnly' => true, 'required' => true],
+				['key' => 'node_uuid', 'name' => 'UUID', 'type' => 'WebImage.DataTypes.String', 'isReadOnly' => true, 'required' => true],
+				['key' => 'node_version', 'name' => 'Version', 'type' => 'WebImage.DataTypes.Integer', 'isReadOnly' => true, 'required' => true, 'default' => 1],
+				['key' => 'updated', 'name' => 'Updated', 'type' => 'WebImage.DataTypes.DateTime', 'isReadOnly' => true, 'required' => true],
 				['key' => 'updated_by', 'name' => 'Updated', 'type' => 'WebImage.DataTypes.Integer', 'isReadOnly' => true]
 			],
 			'config' => ['modelKey' => 'nodes']
@@ -31,22 +31,22 @@ return [
 			'qname' => 'WebImage.Types.Type',
 			'parent' => 'WebImage.Types.Base',
 			'config' => ['modelKey' => 'node_types'],
-//			'properties' => [
-//				['key' => 'config', 'name' => 'Config', 'type' => 'WebImage.DataTypes.Text'],
-//				//['key' => 'node_id', 'name' => '', 'type' => 'WebImage.DataTypes.String'],
-//				['key' => 'is_extension', 'name' => '', 'type' => 'WebImage.DataTypes.String'],
+			'properties' => [
+				['key' => 'config', 'name' => 'Config', 'type' => 'WebImage.DataTypes.Text'],
+//				//['key' => 'node_uuid', 'name' => '', 'type' => 'WebImage.DataTypes.String'],
+				['key' => 'is_extension', 'name' => '', 'type' => 'WebImage.DataTypes.Boolean'],
 //				['key' => 'name', 'name' => '', 'type' => 'WebImage.DataTypes.String'],
-//				['key' => 'parent', 'name' => '', 'type' => 'WebImage.DataTypes.String'],
-//				['key' => 'plural_name', 'name' => '', 'type' => 'WebImage.DataTypes.String'],
-//				['key' => 'qname', 'name' => '', 'type' => 'WebImage.DataTypes.String'],
+				['key' => 'parent', 'name' => '', 'type' => 'WebImage.DataTypes.String'],
+				['key' => 'plural_name', 'name' => '', 'type' => 'WebImage.DataTypes.String'],
+				['key' => 'qname', 'name' => '', 'type' => 'WebImage.DataTypes.String', 'required' => true],
 //				//['key' => 'table_key', 'name' => '', 'type' => 'WebImage.DataTypes.String'],
-//			]
+			]
 		],
 		[
 			'qname' => 'WebImage.Types.HierarchyNode',
 			'parent' => 'WebImage.Types.Base',
 			'properties' => [
-				['key' => 'parent', 'name' => 'Parent', 'type' => 'WebImage.DataTypes.Node']
+				['key' => 'parent', 'name' => 'Parent', 'type' => 'WebImage.DataTypes.NodeRef']
 			],
 //			'extensions' => [
 //				['qname' => 'WebImage.TypeExtensions.Created']
@@ -74,7 +74,7 @@ return [
 				['name' => 'WebImage.Types.OwnableExtension']
 			],
 			'properties' => [
-				['key' => 'body', 'name' => 'Body', 'searchable' => true]
+				['key' => 'body', 'name' => 'Body', 'type' => 'WebImage.DataTypes.Text', 'searchable' => true]
 			]
 		],
 
