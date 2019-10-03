@@ -18,11 +18,15 @@ class NodeTypePropertyDef
 	/**
 	 * @var string
 	 */
-	private $qname;
+	private $dataType;
 	/**
 	 * @var bool
 	 */
 	private $isRequired;
+	/**
+	 * @var
+	 */
+	private $isMultiValued;
 	/**
 	 * @var mixed
 	 */
@@ -54,7 +58,7 @@ class NodeTypePropertyDef
 	 * @param string $nodeTypeQName
 	 * @param string $key
 	 * @param string $name
-	 * @param string $qname
+	 * @param string $dataType
 	 * @param bool $required
 	 * @param mixed $default
 	 * @param bool $isMultiValued
@@ -63,19 +67,27 @@ class NodeTypePropertyDef
 	 *
 	 * @throws \Exception When invalid property configuration is specified
 	 */
-	function __construct($nodeTypeQName, $key, $name, $qname, $required = false, $default = null, $isMultiValued = false, $sortorder = null, Config $config = null)
+	function __construct(string $nodeTypeQName,
+	                     string $key, string $name,
+	                     string $dataType,
+	                     bool $required = false,
+	                     $default = null,
+	                     bool $isMultiValued = false,
+	                     int $sortorder = null,
+	                     Config $config = null)
 	{
 		$this->setNodeTypeQName($nodeTypeQName);
 		$this->setKey($key);
 		$this->setName($name);
-		$this->setQName($qname);
-		$this->isRequired($required);
+		$this->setDataType($dataType);
+		$this->setRequired($required);
 		$this->setDefault($default);
-		$this->isMultiValued($isMultiValued);
-		$this->setSortorder($sortorder);
+		$this->setMultiValued($isMultiValued);
+		if (null !== $sortorder) $this->setSortorder($sortorder);
 
 		if (null === $config) $config = new Dictionary();
 		else if (!($config instanceof Dictionary)) throw new \Exception('Invalid property configuration');
+
 		$this->setConfig($config);
 	}
 
@@ -90,14 +102,14 @@ class NodeTypePropertyDef
 		return $this->key;
 	}
 
-	public function getName()
+	public function getName(): string
 	{
 		return $this->name;
 	}
 
-	public function getQName()
+	public function getDataType(): string
 	{
-		return $this->qname;
+		return $this->dataType;
 	}
 
 	public function getDefault()
@@ -105,7 +117,7 @@ class NodeTypePropertyDef
 		return $this->default;
 	}
 
-	public function getSortorder()
+	public function getSortorder(): int
 	{
 		return $this->sortorder;
 	}
@@ -119,24 +131,24 @@ class NodeTypePropertyDef
 	}
 
 	// Setters
-	public function setNodeTypeQName($qnameStr)
+	public function setNodeTypeQName(string $qnameStr)
 	{
 		$this->nodeTypeQName = $qnameStr;
 	}
 
-	public function setKey($key)
+	public function setKey(string $key)
 	{
 		$this->key = $key;
 	}
 
-	public function setName($name)
+	public function setName(string $name)
 	{
 		$this->name = $name;
 	}
 
-	public function setQName($qname)
+	public function setDataType(string $qname)
 	{
-		$this->qname = $qname;
+		$this->dataType = $qname;
 	}
 
 	public function setDefault($default)
@@ -144,7 +156,7 @@ class NodeTypePropertyDef
 		$this->default = $default;
 	}
 
-	public function setSortorder($sortorder)
+	public function setSortorder(int $sortorder)
 	{
 		$this->sortorder = $sortorder;
 	}
@@ -155,47 +167,43 @@ class NodeTypePropertyDef
 	}
 
 	// Dual purpose getters/setters
-	public function isRequired($trueFalse = null)
+	public function isRequired($trueFalse = null): bool
 	{
-		if (null === $trueFalse) { // Getter
-			return $this->isRequired;
-		} else if (!is_bool($trueFalse)) {
-			throw new \InvalidArgumentException(sprintf('%s was expecting a boolean value', __METHOD__));
-		} else { // Setter
-			$this->isRequired = $trueFalse;
-		}
+		return $this->isRequired;
 	}
 
-	public function isMultiValued($trueFalse = null)
+	public function setRequired(bool $required)
 	{
-		if (null === $trueFalse) { // Getter
-			return $this->isMultiValued;
-		} else if (!is_bool($trueFalse)) {
-			throw new \InvalidArgumentException(sprintf('%s was expecting a boolean value', __METHOD__));
-		} else { // Setter
-			$this->isMultiValued = $trueFalse;
-		}
+		$this->isRequired = $required;
 	}
 
-	public function isReadOnly($trueFalse = null)
+	public function isMultiValued(): bool
 	{
-		if (null === $trueFalse) { // Getter
-			return $this->readOnly;
-		} else if (!is_bool($trueFalse)) {
-			throw new \InvalidArgumentException(sprintf('%s was expecting a boolean value', __METHOD__));
-		} else {
-			$this->readOnly = $trueFalse;
-		}
+		return $this->isMultiValued;
 	}
 
-	public function isSearchable($trueFalse = null)
+	public function setMultiValued(bool $multiValued)
 	{
-		if (null === $trueFalse) { // Getter
-			return $this->searchable;
-		} else if (!is_bool($trueFalse)) {
-			throw new \InvalidArgumentException(sprintf('%s was expecting a boolean value', __METHOD__));
-		} else {
-			$this->searchable = $trueFalse;
-		}
+		$this->isMultiValued = $multiValued;
+	}
+
+	public function isReadOnly(): bool
+	{
+		return $this->readOnly;
+	}
+
+	public function setReadOnly(bool $readOnly)
+	{
+		$this->readOnly = $readOnly;
+	}
+
+	public function isSearchable(): bool
+	{
+		return $this->searchable;
+	}
+
+	public function setSearchable(bool $searchable)
+	{
+		$this->searchable = $searchable;
 	}
 }
