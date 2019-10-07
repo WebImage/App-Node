@@ -241,6 +241,18 @@ class DictionaryService implements RepositoryAwareInterface
 
 	public function addConfig(Config $config)
 	{
+		$this->addNamespaces($config);
+		$this->addTypes($config);
+		$this->addExtensions($config);
+		$this->addDataTypes($config);
+	}
+
+	/**
+	 * Namespaces
+	 * @var Config $type
+	 */
+	private function addNamespaces(Config $config)
+	{
 		/**
 		 * Namespaces
 		 * @var Config $type
@@ -251,18 +263,30 @@ class DictionaryService implements RepositoryAwareInterface
 			$uri = $namespace->get('uri');
 			$this->namespaces->set($prefix, $uri);
 		}
+	}
 
+	/**
+	 * Process Types
+	 * @param Config $config
+	 */
+	private function addTypes(Config $config)
+	{
 		/**
-		 * Process Types
 		 * @var Config $type
 		 */
 		foreach ($config->get('types', []) as $type) {
 			$typeDef = self::processTypeOrExtension(self::$TYPE_STANDARD, $type);
 			$this->types->set($typeDef->getQName(), $typeDef);
 		}
+	}
 
+	/**
+	 * Process Extensions
+	 * @param Config $config
+	 */
+	private function addExtensions(Config $config)
+	{
 		/**
-		 * Process Extensions
 		 * @var Config $extension
 		 */
 		foreach ($config->get('extensions', []) as $extension) {
@@ -271,39 +295,73 @@ class DictionaryService implements RepositoryAwareInterface
 			$extension_def->setFinal(true); // Extensions are not currently extendable
 			$this->types->set($extension_def->getQName(), $extension_def);
 		}
+	}
 
+	/**
+	 * Process Data Types
+	 * @param Config $config
+	 */
+	private function addDataTypes(Config $config)
+	{
 		/**
-		 * Process Data Types
 		 * @var Config $dataType
 		 */
 		foreach($config->get('dataTypes', []) as $dataType) {
 
 			$type = $dataType->get('type');
 			$name = $dataType->get('name');
-			$phpType = trim($dataType->get('phpType'));
-//			$inputElement = $dataType->get('defaultInputElementClass');
+			$mapper = $dataType->get('mapper');
+			$typeLabel = $type ?: 'Unknown';
 
-			$dtype = new DataType($type, $name);
-
-			if ($dataType->has('phpClassFile')) {
-				$dtype->setPhpClass($dataType->get('phpClassFile'));
-			} else if ($dataType->has('phpType')) {
-				$dtype->setPhpType($dataType->get('phpType'));
+			foreach(['type', 'name'] as $requiredVar) {
+				if (!$dataType->has($requiredVar)) {
+					$hasKeys = count($dataType) > 0 ? implode(', ', $dataType->keys()) : 'None';
+					throw new \RuntimeException(sprintf('Data type (%s) is missing required var: %s (%s)', $typeLabel, $requiredVar, $hasKeys));
+				}
 			}
 
-			$modelFields = $dataType->has('modelFields') ? $dataType->get('modelFields') : [];
-			if ($dataType->has('modelField')) $modelFields[] = $dataType->get('modelField');
+			$dtype = new DataType($type, $name, $mapper);
+			$this->addDataTypeModelFields($typeLabel, $dtype, $dataType);
 
-			/**
-			 * Field types
-			 * @var Config $field_type
-			 */
-			foreach ($modelFields as $modelField) {
-				$dtype->addModelField(
-					DataTypeModelField::createFromConfig($modelField)
-				);
-			}
 			$this->dataTypes->set($dtype->getType(), $dtype);
+		}
+	}
+
+	private function addDataTypeModelFields(string $typeLabel, DataType $type, Config $dataType)
+	{
+		if ($dataType->has('modelFields') && $dataType->has('modelField')) throw new \RuntimeException(sprintf('Data type (%s) must define modelField or modelFields, but not both', $typeLabel));
+
+		$requiredVars = [];
+		$modelFields = [];
+
+		if ($dataType->has('modelFields')) {
+			$requiredVars = ['type', 'key', 'name'];
+			$modelFields = $dataType->get('modelFields');
+		} else if ($dataType->has('modelField')) {
+			$requiredVars = ['type'];
+			$modelFields = [ $dataType->get('modelField') ];
+		} else {
+			throw new \RuntimeException(sprintf('Data type (%s) must define modelField or modelFields', $typeLabel));
+		}
+
+		/**
+		 * Ensure that each model field has all required configuration vars
+		 * @var Config $modelField
+		 */
+		foreach($modelFields as $modelField) {
+			foreach ($requiredVars as $requiredVar) {
+				if (!$modelField->has($requiredVar)) throw new \RuntimeException(sprintf('Data type (%s) model fields must define %s', $typeLabel, $requiredVar));
+			}
+		}
+
+		/**
+		 * Field types
+		 * @var Config $modelField
+		 */
+		foreach ($modelFields as $modelField) {
+			$type->addModelField(
+				DataTypeModelField::createFromConfig($modelField)
+			);
 		}
 	}
 

@@ -15,7 +15,7 @@ class NodeRef implements NodeRefInterface, EntityRefInterface
 	 */
 	private $version;
 
-	public function __construct($uuid, $version)
+	public function __construct(string $uuid, string $version)
 	{
 		$this->uuid = $uuid;
 		$this->version = $version;
@@ -25,7 +25,7 @@ class NodeRef implements NodeRefInterface, EntityRefInterface
 	 * Get the unique identifier
 	 * @return string
 	 */
-	public function getUuid()
+	public function getUuid(): string
 	{
 		return $this->uuid;
 	}
@@ -35,7 +35,7 @@ class NodeRef implements NodeRefInterface, EntityRefInterface
 	 *
 	 * @return string
 	 */
-	public function getVersion()
+	public function getVersion(): string
 	{
 		return $this->version;
 	}

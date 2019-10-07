@@ -9,6 +9,8 @@ class DataTypeModelField {
 	/** @var string One of WebImage\Node\Types\Type::CONSTANTS */
 	private $type;
 	/** @var string */
+	private $key;
+	/** @var string */
 	private $name;
 	/** @var Dictionary */
 	private $options;
@@ -17,12 +19,14 @@ class DataTypeModelField {
 	 * DataTypeModelField constructor.
 	 *
 	 * @param string $type
+	 * @param string|null $key
 	 * @param string|null $name
 	 * @param Dictionary|null $options
 	 */
-	public function __construct($type, $name=null, Dictionary $options=null)
+	public function __construct(string $type, string $key=null, string $name=null, Dictionary $options=null)
 	{
 		$this->type = $type;
+		$this->key = $key;
 		$this->name = $name;
 		$this->options = null === $options ? new Dictionary() : $options;
 	}
@@ -30,15 +34,23 @@ class DataTypeModelField {
 	/**
 	 * @return string
 	 */
-	public function getType()/*: string */
+	public function getType(): string
 	{
 		return $this->type;
 	}
 
 	/**
-	 * @return string
+	 * @return string|null
 	 */
-	public function getName()/*: string */
+	public function getKey(): ?string
+	{
+		return $this->name;
+	}
+
+	/**
+	 * @return string|null
+	 */
+	public function getName(): ?string
 	{
 		return $this->name;
 	}
@@ -46,13 +58,18 @@ class DataTypeModelField {
 	/**
 	 * @return Dictionary|null
 	 */
-	public function getOptions()
+	public function getOptions(): ?Dictionary
 	{
 		return $this->options;
 	}
 
 	public static function createFromConfig(Config $config)
 	{
-		return new static($config->get('type'), $config->get('name'), $config->get('options'));
+		return new static(
+			$config->get('type'),
+			$config->get('key'),
+			$config->get('name'),
+			$config->get('options')
+		);
 	}
 }

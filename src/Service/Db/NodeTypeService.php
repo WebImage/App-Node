@@ -422,7 +422,7 @@ class NodeTypeService implements NodeTypeServiceInterface
 				 *
 				 * However, if a value is defined then it will be appended to the property name in the format: {$propertyFieldName}_{$modelFieldName}.  This will generally happen if the model_field definition includes multiple fields
 				 */
-				$modelFieldName = $modelField->getName(); // My default this will be empty
+				$modelFieldName = $modelField->getKey(); // My default this will be empty
 
 				$propertyFieldName = $propertyDef->getKey();
 				// Append $modelFieldName to property
@@ -852,7 +852,7 @@ class NodeTypeService implements NodeTypeServiceInterface
 
 		foreach($properties as $property) {
 
-			$config = empty($property['config']) ? [] : json_decode($property['config']);
+			$config = empty($property['config']) ? [] : json_decode($property['config'], true);
 			$config = new Config($config);
 
 			$nodeTypeProperty = new NodeTypePropertyDef(

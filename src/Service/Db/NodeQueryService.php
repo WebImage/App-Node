@@ -7,6 +7,7 @@ use WebImage\Core\Dictionary;
 use WebImage\Db\ConnectionManager;
 use WebImage\Node\Defs\NodeTypePropertyDef;
 use WebImage\Node\Entities\Node;
+use WebImage\Node\Properties\MultiValuePropertyInterface;
 use WebImage\Node\Properties\MultiValuePropertyValue;
 use WebImage\Node\Properties\Property;
 use WebImage\Node\Query\Filter;
@@ -93,7 +94,7 @@ class NodeQueryService
 	private function convertResultToNode(array $result, string $rootTableKey)
 	{
 		$repository = $this->getRepository();
-		$dataService = $repository->getDataTypeService();
+		$dataTypeService = $repository->getDataTypeService();
 		$typeService = $repository->getNodeTypeService();
 		$tableNameHelper = $this->getTableNameHelper();
 
@@ -118,8 +119,6 @@ class NodeQueryService
 
 			$typeDef = $stackType->getDef();
 
-//			if (!($typeDef instanceof NodeTypeRef)) continue;
-
 			$propertyDefs = $typeDef->getProperties();
 
 			foreach($propertyDefs as $propertyDef) {
@@ -127,7 +126,7 @@ class NodeQueryService
 				$propertyTableKey = null; // Defined below
 				$propertyKey = $propertyDef->getKey();
 
-				$propertyDataType = $dataService->getDataType($propertyDef->getDataType());
+				$propertyDataType = $dataTypeService->getDataType($propertyDef->getDataType());
 
 				/**
 				 * Get Property Definition Original Table
@@ -140,49 +139,29 @@ class NodeQueryService
 				$propParentTypeDef = $propParentType->getDef();
 
 				$propertyTableKey = $this->getTableNameHelper()->getTableKeyFromDef($propParentTypeDef);
-				$column = $tableNameHelper->getColumnNameAlias($propertyTableKey, $propertyKey);
 
-				if ($propertyDataType->isSimpleStorage()) {
-					if (in_array($column, $columns)) { // isset($result[$column]) does not work for nulls
-						$property = null;
+				$property = null;
 
-						if ($propertyDef->isMultiValued()) {
-							$property = new MultiValuePropertyValue();
-							#if ($defaultValue = $def->getDefault()) $nodeProperty->addValue($nodeProperty->setValue($def->getDefault()));
-						} else {
-							$property = new Property();
-							$property->setValue($result[$column]);
-						}
-						$property->setDef($propertyDef);
-						$node->addProperty($propertyKey, $property);
-					}
-				} else {
+				if ($propertyDef->isMultiValued()) throw new \Exception('Multi valued properties are not yet supported'); // $property = new MultiValuePropertyValue();
 
-					throw new \RuntimeException('Complext storage is not yet implemented');
+				$property = new Property();
 
-					$dataTypeModelFields = $propertyDataType->getModelFields();
+				$d = new Dictionary();
+				$property->setValue($d);
 
-					$d = new Dictionary();
+				foreach($propertyDataType->getModelFields() as $field) {
 
-					foreach($dataTypeModelFields as $dataTypeModelField) {
-						$fieldName = $propertyKey . '_' . $dataTypeModelField->getName();
+					$key = null === $field->getKey() ? '' : $field->getKey();
+					$column = $tableNameHelper->getColumnName($propertyTableKey, $propertyKey, $field->getKey());
+					$alias = $tableNameHelper->getColumnNameAlias($propertyTableKey, $propertyKey, $field->getKey());
 
-						if (isset($result[$fieldName])) {
-							$d->set($dataTypeModelField->getName(), $result[$fieldName]);
-						}
-					}
+					if (!in_array($alias, $columns)) continue; // isset($result[$column]) does not work for nulls
 
-					if ($propertyDef->isMultiValued()) {
-						$property = new MultiValueProperty(); // CWI_CNODE_NodeMultiProperty();
-						#if ($default_value = $def->getDefault()) $nodeProperty->addValue($nodeProperty->setValue($def->getDefault()));
-					} else {
-						$property = new Property();
-						$property->setValue($d);
-					}
-
-					$property->setDef($propertyDef);
-					$node->addProperty($propertyKey, $property);
+					$d->set($key, $result[$alias]);
 				}
+
+				$property->setDef($propertyDef);
+				$node->addProperty($propertyKey, $property);
 			}
 		}
 
@@ -238,62 +217,12 @@ class NodeQueryService
 		return $filterKeywords;
 	}
 
-//	private function getFilters(Query $query)
-//	{
-//		$filters = [];
-//		/**
-//		 * Add filters
-//		 */
-//
-//		foreach($columns as $column) {
-//
-//			$tableKey = $column['tableKey'];
-//			$object = $column['object'];
-//
-//			$filter = array(
-//				'queryFilter' => $object,
-//				'tableKey' => $tableKey
-//			);
-//
-//			$filters[] = $filter;
-//		}
-//
-//		return $filters;
-//	}
-
-//	private function getSorts(Query $query)
-//	{
-//		$sorts = [];
-//		/**
-//		 * Add sorts
-//		 */
-//
-//		$propertiesInfo = $this->getColumnsForProperties($query, $query->getSorts());
-//
-//		foreach($propertiesInfo as $propertyInfo) {
-//
-//			$tableKey = $propertyInfo->getTableKey();
-//
-//			$tableKey = $propertyInfo['tableKey'];
-//			$object = $propertyInfo['object'];
-//
-//			$sort = array(
-//				'querySort' => $object,
-//				'tableKey' => $tableKey
-//			);
-//			$sorts[] = $sort;
-//		}
-//echo '<pre>';print_r($sorts);echo '<hr />' . __FILE__ .':'.__LINE__;exit;
-//		return $sorts;
-//	}
-
 	private function configureSelect(DbQueryBuilder $qb, Query $query)
 	{
 		/**
 		 * Add fields
 		 */
 		$propertiesInfo = $this->getColumnsForProperties($query, $query->getProperties());
-		$colFormat = '%s.`%s` AS %s';
 
 		if (count($propertiesInfo) > 0) throw new \RuntimeException('Selecting specific columns is not currently supported');
 
@@ -301,6 +230,8 @@ class NodeQueryService
 		 * Add all fields from all tables
 		 */
 		$typeService = $this->getRepository()->getNodeTypeService();
+		$dataTypeService = $this->getRepository()->getDataTypeService();
+		$tableNameHelper = $this->getTableNameHelper();
 
 		// Add all columns to results
 		$uniqueColumns = [];
@@ -316,13 +247,16 @@ class NodeQueryService
 				foreach($type->getDef()->getProperties() as $property) {
 					if ($property->isMultiValued()) continue; // Multi-valued properties are handled elsewhere
 
-					$column = $property->getKey();
-					$alias = $this->getTableNameHelper()->getColumnNameAlias($tableKey, $column);
+					$dataType = $dataTypeService->getDataType($property->getDataType());
 
-					// Ensure that a column only gets added once
-					if (!in_array($alias, $uniqueColumns)) {
-						$uniqueColumns[] = $alias;
-						$qb->addSelect(sprintf($colFormat, $tableKey, $column, $alias));
+					foreach($dataType->getModelFields() as $field) {
+						$column = $tableNameHelper->getColumnName($tableKey, $property->getKey(), $field->getKey());
+						$alias = $tableNameHelper->getColumnNameAlias($tableKey, $property->getKey(), $field->getKey());
+
+						if (!in_array($alias, $uniqueColumns)) {
+							$uniqueColumns[] = $alias;
+							$qb->addSelect(sprintf('%s AS %s', $column, $alias));
+						}
 					}
 				}
 			}

@@ -2,6 +2,7 @@
 
 namespace WebImage\Node\Entities;
 
+use ArrayAccess;
 use WebImage\Node\Properties\InvalidPropertyException;
 use WebImage\Node\Properties\MultiValueProperty;
 use WebImage\Node\Properties\MultiValuePropertyInterface;
@@ -9,7 +10,7 @@ use WebImage\Node\Properties\Property;
 use WebImage\Node\Properties\PropertyInterface;
 use WebImage\Node\Properties\SingleValuePropertyInterface;
 
-class Node extends AbstractRepositoryEntity {
+class Node extends AbstractRepositoryEntity implements ArrayAccess {
 	/**
 	 * @var string
 	 */
@@ -331,5 +332,26 @@ class Node extends AbstractRepositoryEntity {
 	public function getAssociations()
 	{
 		return $this->associations;
+	}
+
+	public function offsetExists($offset)
+	{
+		throw new \RuntimeException('Not implemented');
+	}
+
+	public function offsetGet($offset)
+	{
+		return $this->getPropertyValue($offset);
+		die(__FILE__.':'.__LINE__.PHP_EOL);
+	}
+
+	public function offsetSet($offset, $value)
+	{
+		die(__FILE__.':'.__LINE__.PHP_EOL);
+	}
+
+	public function offsetUnset($offset)
+	{
+		throw new \RuntimeException('Not implemented');
 	}
 }

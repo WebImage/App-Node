@@ -3,6 +3,7 @@
 namespace WebImage\Node\Defs;
 
 use Exception;
+use WebImage\Node\PropertyValueMapper\PropertyValueMapperInterface;
 
 /**
  * Represents a data types
@@ -13,69 +14,99 @@ use Exception;
 class DataType {
 	private $type;
 	private $name; /* Friendly Name */
-	private $phpType;
-	private $phpClassName;
+	/** @var string $propertyValueMapper A mappers that converts dictionary values to a class */
+	private $propertyValueMapper;
 	/** @var DataTypeModelField[] */
 	private $modelFields = [];
-	/**
-	 * @property string a class name that can be looked up against the CNodeTypeService (or extensibly the DictionaryService)
-	 **/
-	private $defaultInputElementClass;
+	/** @property string A name resolvable to an input element **/
+	private $defaultFormElement;
 
-	function __construct($type, $name, $input_element_class_name=null)
+	function __construct($type, $name, string $propertyValueMapper=null, string $formElement=null)
 	{
 		$this->setType($type);
 		$this->setName($name);
-
-		$this->defaultInputElementClass = $input_element_class_name;
+		if (null !== $propertyValueMapper) $this->setPropertyValueMapper($propertyValueMapper);
+		if (null !== $formElement) $this->setDefaultFormElement($formElement);
 	}
 
-	public function getType() { return $this->type; }
-	public function getName() { return $this->name; }
-	public function getPhpType() { return $this->phpType; }
-	public function getPhpClassName() { return $this->phpClassName; }
-	public function getModelFields() { return $this->modelFields; }
-	public function getDefaultInputElementClass() { return $this->defaultInputElementClass; }
 	/**
-	 * Returns whether the PHP variable that represents this object is a simple type (i.e. string, int, boolean, etc.), or whether this type needs to be represented by a more complext type/class.  If $this->phpType is empty then assume it is a complex type
-	 **/
-	public function isSimplePhpType()
+	 * @return string
+	 */
+	public function getType(): string
 	{
-		return $this->getPhpType() !== null;
+		return $this->type;
 	}
 
-	public function setType($type)
+	/**
+	 * @return string
+	 */
+	public function getName(): string
+	{
+		return $this->name;
+	}
+
+	/**
+	 * @return string
+	 */
+	public function getPropertyValueMapper(): string
+	{
+		return $this->propertyValueMapper;
+	}
+
+	/**
+	 * @return DataTypeModelField[]
+	 */
+	public function getModelFields()
+	{
+		return $this->modelFields;
+	}
+
+	/**
+	 * @return mixed
+	 */
+	public function getDefaultFormElement()
+	{
+		return $this->defaultFormElement;
+	}
+
+	/**
+	 * @param string $type
+	 */
+	public function setType(string $type)
 	{
 		$this->type = $type;
 	}
 
-	public function setName($name)
+	/**
+	 * @param string $name
+	 */
+	public function setName(string $name)
 	{
 		$this->name = $name;
 	}
 
-	public function setPhpType($type)
+	/**
+	 * Sets a reference to a resolvable input element
+	 * @param string $inputElement
+	 * @return string
+	 */
+	public function setDefaultFormElement(string $inputElement)
 	{
-		$this->phpType = $type;
-		$this->phpClassName = null;
+		return $this->defaultFormElement;
 	}
 
-	public function setDefaultInputElementClass()
+	/**
+	 * A valuable resolvable to a PropertyValueMapper
+	 * @param $propertyValueMapper
+	 */
+	public function setPropertyValueMapper(string $propertyValueMapper)
 	{
-		return $this->defaultInputElementClass;
+		$this->propertyValueMapper = $propertyValueMapper;
 	}
 
-	public function setPhpClass($php_class_name)
-	{
-		$this->setPhpClassName($php_class_name);
-		$this->phpType = null;
-	}
-
-	private function setPhpClassName($php_class_name)
-	{
-		$this->phpClassName = $php_class_name;
-	}
-
+	/**
+	 * @param DataTypeModelField $model_field
+	 */
 	public function addModelField(DataTypeModelField $model_field)
 	{
 		$this->modelFields[] = $model_field;
@@ -88,6 +119,6 @@ class DataType {
 	 */
 	public function isSimpleStorage()
 	{
-		return (count($this->modelFields) == 1 && strlen($this->modelFields[0]->getName()) == 0);
+		return (count($this->modelFields) == 1 && strlen($this->modelFields[0]->getKey()) == 0);
 	}
 }

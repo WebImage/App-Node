@@ -203,7 +203,7 @@ class JsonNodeTypeConverter
 			$isMultiValued = $property->get('isMultiValued', false);
 			$isReadOnly = $property->get('isReadOnly', false);
 			$sortorder = $property->get('sortorder');
-			$config = null; // $property->get('config');
+			$config = $property->get('config');
 
 			// Check name
 			foreach(compact('key', 'name', 'type') as $strKey => $strValue) {

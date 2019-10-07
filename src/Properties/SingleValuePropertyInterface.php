@@ -13,7 +13,7 @@ interface SingleValuePropertyInterface
 	 *
 	 * @return string|ImmutableDictionary
 	 */
-	public function getValue($subKey='');
+	public function getValue(string $subKey='');
 
 	/**
 	 * Returns a Dictionary representation of the value (useful for structured
@@ -28,5 +28,5 @@ interface SingleValuePropertyInterface
 	 * @param string|int|array[string]mixed|Dictionary $value
 	 * @param string $forSubKey If this is a complex (i.e. Dictionary) value, then set the value for a specific dictionary value
 	 */
-	public function setValue($value, $forSubKey='');
+	public function setValue($value, string $forSubKey='');
 }

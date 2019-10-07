@@ -169,16 +169,6 @@ class NodeService implements NodeServiceInterface
 		// Make sure that the object being passed contains a correct reference type
 		$nodeRef = $node->getNodeRef();
 
-		// Make sure that locale always contains a value
-//		if ($locale_property = $node->getProperty('locale')) {
-//			if (strlen($locale_property->getValue()) == 0) $locale_property->setValue('<all>');
-//		}
-
-		// Make sure that profile always contains a value
-//		if ($profile_property = $node->getProperty('profile')) {
-//			if (strlen($profile_property->getValue()) == 0) $profile_property->setValue('<all>');
-//		}
-
 		if (null !== $nodeRef && !($nodeRef instanceof NodeRef)) {
 			throw new Exception(get_class($nodeRef) . ' is currently not a supported node reference');
 		}
@@ -441,9 +431,9 @@ die(__FILE__.':'.__LINE__.PHP_EOL);
 
 							foreach($dataTypeModelFields as $dataTypeModelField) {
 
-								$compositeFieldName = $fieldName . '_' . $dataTypeModelField->getName();
+								$compositeFieldName = $fieldName . '_' . $dataTypeModelField->getKey();
 
-								$typeData[$compositeFieldName] = $complexPropertyValue->get($dataTypeModelField->getName());
+								$typeData[$compositeFieldName] = $complexPropertyValue->get($dataTypeModelField->getKey());
 							}
 						}
 					}
@@ -674,7 +664,7 @@ die(__FILE__.':'.__LINE__.PHP_EOL);
 					$qb->addSelect($propertyKey);
 				} else {
 					foreach($dataType->getModelFields() as $modelField) {
-						$fieldKey = $propertyKey . '_' . $modelField->getName();
+						$fieldKey = $propertyKey . '_' . $modelField->getKey();
 						$qb->addSelect($fieldKey);
 					}
 				}
@@ -695,8 +685,8 @@ die(__FILE__.':'.__LINE__.PHP_EOL);
 					} else {
 						$d = new Dictionary();
 						foreach($dataType->getModelFields() as $modelField) {
-							$fieldKey = $propertyKey . '_' . $modelField->getName();
-							$d->set($modelField->getName(), $result[$fieldKey]);
+							$fieldKey = $propertyKey . '_' . $modelField->getKey();
+							$d->set($modelField->getKey(), $result[$fieldKey]);
 						}
 						$property->addValue($d);
 					}
@@ -763,29 +753,17 @@ die(__FILE__.':'.__LINE__.PHP_EOL);
 
 						} else {
 
-							// Whether the value is stored in a single column...
-							if ($dataType->isSimpleStorage()) {
+							$d = new Dictionary();
 
-								$resultKey = $tableNameHelper->getColumnNameAlias($typeTableKey, $columnKey);
+							foreach($dataType->getModelFields() as $field) {
+								$key = $field->getKey() ? : '';
+								$resultKey = $tableNameHelper->getColumnNameAlias($typeTableKey, $columnKey, $field->getKey());
 								$value = isset($result[$resultKey]) ? $result[$resultKey] : null;
-								$property->setValue($value);
-
-							// Or multiple columns
-							} else {
-
-								$dataTypeModelFields = $dataType->getModelFields();
-
-								$d = new Dictionary();
-
-								foreach ($dataTypeModelFields as $dataTypeModelField) {
-									// Database field name
-									$resultKey = $tableNameHelper->getColumnNameAlias($typeTableKey, $columnKey, $dataTypeModelField->getName());
-									$value = isset($result[$resultKey]) ? $result[$resultKey] : null;
-									$d->set($dataTypeModelField->getName(), $value);
-								}
-
-								$property->setValue($d);
+								$d->set($key, $value);
 							}
+
+							$property->setValue($d);
+
 							$node->addProperty($propertyDef->getKey(), $property);
 						}
 					}
@@ -864,12 +842,12 @@ die(__FILE__.':'.__LINE__.PHP_EOL);
 					$selectField = $tableNameHelper->getColumnName(
 						$tableKey,
 						$propertyDef->getKey(),
-						$propDataType->isSimpleStorage() ? null : $modelField->getName()
+						$propDataType->isSimpleStorage() ? null : $modelField->getKey()
 						);
 					$selectAlias = $tableNameHelper->getColumnNameAlias(
 						$tableKey,
 						$propertyDef->getKey(),
-						$propDataType->isSimpleStorage() ? null : $modelField->getName()
+						$propDataType->isSimpleStorage() ? null : $modelField->getKey()
 						);
 
 					$qb->addSelect(sprintf('%s AS %s', $selectField, $selectAlias));

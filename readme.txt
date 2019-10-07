@@ -5,41 +5,48 @@ Rules
 ON CREATE ASSOCIATION Node.Types.ContactNote
 UPDATE Node.Type.Contact SET LastContacted = DATE()
 
+Fix default for node.created (date.now())
 
-node_association_defs
-- allow_duplicates
-- assoc_type_qname
-- dst_has_many
-- dst_required
-- dst_strict
-- name
-- src_has_many
-- src_required
-- src_strict
+$node->getPropertyValue('nodeRef') => Node
+    - Internally, translates 0000-0000-0000-00001 => new Node
 
-node_association_def_meta [ADD]
-- assoc_type_qname
-- name
-- key
-- value
+$node->setPropertyValue('nodeRef', $otherNode)
+    - Internally, translates Node by using $otherNode->getUuid()
 
-node_type_associations
-- assoc_type_qname
-- node_type_id
-- sortorder
+NodeRefValueTranslator || DataTypeValueMapper ||
+    ->valueForDisplay() || ->get(): NodeRef
+    ->valueForStorage() || ->set(NodeRef $nodeRef)
 
-node_associations
-- assoc_type_qname
-- src_node_id
-- src_node_version
-- tgt_node_id
-- tgt_node_version
+DataTypeValueMapper::get($node, $property);
+DataTypeValueMapper::set($node, $property, $value);
+$dataTypeService->getValueMapper
 
-node_association_meta [ADD]
-- assoc_type_qname
-- src_node_id
-- src_node_version
-- tgt_node_id
-- tgt_node_version
-- key
-- value
+$node['names'] = ['Name'];
+$node['nodeRef'] = new
+\WebImage\Node\DataTypes\ValueMappers\NodeRefValueMapper
+
+
+template.php
+    $render($nodeRef) => <?= $nodeService->getNodeByUuid($nodeRef->getUuid(), $nodeRef->getVersion())->getPropertyValue('name')) ?>
+
+Getting form value to node
+    <input type="hidden" name="contact_uuid">
+    <input type="hidden" name="contact_version">
+    <a href="#" onclick="Node.Chooser('WebImage.Types.Activity.contact')">Choose</a>
+    --------------------
+    | Search...        |
+    --------------------
+    | Results          |
+    | Results          |
+    --------------------
+    function Chooser() {
+        $.get('/crm/chooser', 'WebImage.Types.Activity.contact', function(node) {
+            contact_uuid = node.node_uuid;
+            contact_version = node.version;
+            label = node.name;
+        });
+    }
+
+In node service, return
+LazyProperty($uuids,
+LazyMultiValueProperty
