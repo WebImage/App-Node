@@ -1,7 +1,9 @@
 <?php
 
 namespace WebImage\Node\Service;
+use WebImage\Core\Dictionary;
 use WebImage\Node\Defs\DataType;
+use WebImage\Node\Entities\Node;
 
 /**
  * An interface for managing DataTypes and InputElementDefs (and probably display elements)
@@ -47,4 +49,20 @@ interface DataTypeServiceInterface extends RepositoryAwareInterface
 	 * @return DataType[]
 	 */
 	public function getDataTypes();
+
+	/**
+	 * Converts a value to a dictionary for use in storage
+	 * @param string $dataTypeName
+	 * @param $value
+	 * @return mixed
+	 */
+	public function valueForStorage(string $dataTypeName, $value);
+
+	/**
+	 * Converts a dictionary to an value to be added to a Node
+	 * @param DataType $dataTypeName
+	 * @param Dictionary $dictionary
+	 * @return mixed
+	 */
+	public function valueForProperty(string $dataTypeName, $value);
 }

@@ -102,7 +102,7 @@ return [
 		['type' => 'WebImage.DataTypes.Text', 'name' => 'Multi Line', 'formElement' => 'textarea', 'modelField' => ['type' => Type::TEXT]],
 		['type' => 'WebImage.DataTypes.Integer', 'name' => 'Integer', 'formElement' => 'number', 'modelField' => ['type' => Type::INTEGER]],
 		['type' => 'WebImage.DataTypes.Date', 'name' => 'Date', 'formElement' => 'date', 'modelField' => ['type' => Type::DATE]],
-		['type' => 'WebImage.DataTypes.DateTime', 'name' => 'Date/Time', 'formElement' => 'datetime', 'modelField' => ['type' => Type::DATETIME]],
+		['type' => 'WebImage.DataTypes.DateTime', 'name' => 'Date/Time', 'formElement' => 'datetime', 'mapper' => 'datetime', 'view' => 'node/datatypes/datetime', 'modelField' => ['type' => Type::DATETIME]],
 		['type' => 'WebImage.DataTypes.Boolean', 'name' => 'True/False', 'formElement' => 'toggle', 'modelField' => ['type' => Type::BOOLEAN]],
 //		['type' => 'WebImage.DataTypes.QName', 'formElement' => 'text', 'modelField' => ['type' => Type::STRING, 'options' => ['length' => 255]]],
 //		['type' => 'WebImage.DataTypes.Category', 'name' => 'Category', 'formElement' => 'select'],
@@ -127,7 +127,7 @@ return [
 			['key' => 'Zip', 'name' => 'zip', 'type' => Type::STRING, 'options' => ['length' => 10, 'notnull' => false]],
 		]],
 		['type' => 'WebImage.DataTypes.TypeRef', 'name' => 'Type References', 'mapper' => 'typeRef', 'modelField' => ['type' => Type::STRING ]],
-		['type' => 'WebImage.DataTypes.NodeRef', 'name' => 'Reference', 'formElement' => 'text', 'mapper' => 'nodeRef', 'modelFields' => [
+		['type' => 'WebImage.DataTypes.NodeRef', 'name' => 'Reference', 'formElement' => 'text', 'mapper' => 'node-ref', 'modelFields' => [
 			['key' => 'uuid', 'name' => 'UUID', 'type' => Type::STRING, 'options' => ['length' => 255]],
 			['key' => 'version', 'name' => 'Version', 'type' => Type::INTEGER]
 		]],

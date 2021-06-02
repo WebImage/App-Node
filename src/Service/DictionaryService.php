@@ -311,6 +311,8 @@ class DictionaryService implements RepositoryAwareInterface
 			$type = $dataType->get('type');
 			$name = $dataType->get('name');
 			$mapper = $dataType->get('mapper');
+			$view = $dataType->get('view');
+
 			$typeLabel = $type ?: 'Unknown';
 
 			foreach(['type', 'name'] as $requiredVar) {
@@ -319,8 +321,9 @@ class DictionaryService implements RepositoryAwareInterface
 					throw new \RuntimeException(sprintf('Data type (%s) is missing required var: %s (%s)', $typeLabel, $requiredVar, $hasKeys));
 				}
 			}
+			if ($dataType->has('modelFields') && null === $mapper) throw new \RuntimeException(sprintf('A mapper must be defined when there are multiple fields'));
 
-			$dtype = new DataType($type, $name, $mapper);
+			$dtype = new DataType($type, $name, $mapper, $view);
 			$this->addDataTypeModelFields($typeLabel, $dtype, $dataType);
 
 			$this->dataTypes->set($dtype->getType(), $dtype);

@@ -3,7 +3,7 @@
 namespace WebImage\Node\Defs;
 
 use Exception;
-use WebImage\Node\PropertyValueMapper\PropertyValueMapperInterface;
+use WebImage\Node\DataTypes\ValueMapper;
 
 /**
  * Represents a data types
@@ -14,19 +14,21 @@ use WebImage\Node\PropertyValueMapper\PropertyValueMapperInterface;
 class DataType {
 	private $type;
 	private $name; /* Friendly Name */
-	/** @var string $propertyValueMapper A mappers that converts dictionary values to a class */
-	private $propertyValueMapper;
+	/** @var string $valueMapper A mappers that converts dictionary values to a class */
+	private $valueMapper;
 	/** @var DataTypeModelField[] */
 	private $modelFields = [];
-	/** @property string A name resolvable to an input element **/
+	/** @var string A name resolvable to an input element **/
 	private $defaultFormElement;
+	/** @var string $view */
+	private $view;
 
-	function __construct($type, $name, string $propertyValueMapper=null, string $formElement=null)
+	function __construct($type, $name, string $valueMapper=null, string $view=null)
 	{
 		$this->setType($type);
 		$this->setName($name);
-		if (null !== $propertyValueMapper) $this->setPropertyValueMapper($propertyValueMapper);
-		if (null !== $formElement) $this->setDefaultFormElement($formElement);
+		if (null !== $valueMapper) $this->setValueMapper($valueMapper);
+		if (null !== $view) $this->setView($view);
 	}
 
 	/**
@@ -48,9 +50,17 @@ class DataType {
 	/**
 	 * @return string
 	 */
-	public function getPropertyValueMapper(): string
+	public function getValueMapper(): ?string
 	{
-		return $this->propertyValueMapper;
+		return $this->valueMapper;
+	}
+
+	/**
+	 * @return string
+	 */
+	public function getView(): string
+	{
+		return $this->view;
 	}
 
 	/**
@@ -96,12 +106,12 @@ class DataType {
 	}
 
 	/**
-	 * A valuable resolvable to a PropertyValueMapper
-	 * @param $propertyValueMapper
+	 * A valuable resolvable to a ValueMapper
+	 * @param $valueMapper
 	 */
-	public function setPropertyValueMapper(string $propertyValueMapper)
+	public function setValueMapper(string $valueMapper)
 	{
-		$this->propertyValueMapper = $propertyValueMapper;
+		$this->valueMapper = $valueMapper;
 	}
 
 	/**
@@ -120,5 +130,13 @@ class DataType {
 	public function isSimpleStorage()
 	{
 		return (count($this->modelFields) == 1 && strlen($this->modelFields[0]->getKey()) == 0);
+	}
+
+	/**
+	 * @param string $view
+	 */
+	public function setView(string $view)
+	{
+		$this->view = $view;
 	}
 }

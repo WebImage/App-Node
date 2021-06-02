@@ -342,12 +342,11 @@ class Node extends AbstractRepositoryEntity implements ArrayAccess {
 	public function offsetGet($offset)
 	{
 		return $this->getPropertyValue($offset);
-		die(__FILE__.':'.__LINE__.PHP_EOL);
 	}
 
 	public function offsetSet($offset, $value)
 	{
-		die(__FILE__.':'.__LINE__.PHP_EOL);
+		$this->setPropertyValue($offset, $value);
 	}
 
 	public function offsetUnset($offset)

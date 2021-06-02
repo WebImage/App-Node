@@ -2,6 +2,10 @@
 
 namespace WebImage\Node\Service\Db;
 
+use WebImage\Core\Dictionary;
+use WebImage\Node\DataTypes\ValueMapper\ValueMapperInterface;
+use WebImage\Node\DataTypes\ValueMapper\ValueMapperNotFoundException;
+use WebImage\Node\DataTypes\ValueMapper\ValueMapResolver;
 use WebImage\Node\Defs\DataType;
 use WebImage\Node\Defs\InputElementDef;
 use WebImage\Node\Service\DataTypeServiceInterface;
@@ -13,6 +17,20 @@ use WebImage\Node\Service\RepositoryAwareTrait;
 class DataTypeService implements DataTypeServiceInterface
 {
 	use RepositoryAwareTrait;
+	private $NOMAPPER = 'NOMAPPER';
+	private $valueMappers = [];
+	/** @var ValueMapResolver */
+	private $valueMapResolver;
+
+	/**
+	 * DataTypeService constructor.
+	 */
+	public function __construct(ValueMapResolver $valueMapResolver)
+	{
+		$this->valueMappers = new Dictionary();
+		$this->valueMapResolver = $valueMapResolver;
+	}
+
 
 	/**
 	 * Get all input element defs
@@ -83,19 +101,57 @@ class DataTypeService implements DataTypeServiceInterface
 	/**
 	 * @param $dataTypeName
 	 *
-	 * @return array[string]DataType
+	 * @return DataType
 	 */
-	public function getDataType($dataTypeName)
+	public function getDataType($dataTypeName): DataType
 	{
 		return $this->getRepository()->getDictionaryService()->getDataType($dataTypeName);
 	}
 
 	/**
-	 * @return Dictionary<string, DataType> A dictionary of defined data types
+	 * @return DataType[]|Dictionary<string, DataType> A dictionary of defined data types
 	 */
 	public function getDataTypes()
 	{
 		return $this->getRepository()->getDictionaryService()->getDataTypes();
 	}
 
+	/**
+	 * @inheritdoc
+	 */
+	public function valueForStorage(string $dataTypeName, $value)
+	{
+		$mapper = $this->getDataValueMapper($dataTypeName);
+
+		return null === $mapper ? $value : $mapper->forStorage($value);
+	}
+
+	/**
+	 * @inheritdoc
+	 */
+	public function valueForProperty(string $dataTypeName, $value)
+	{
+		$mapper = $this->getDataValueMapper($dataTypeName);
+
+		return null === $mapper ? $value : $mapper->forProperty($value);
+	}
+
+	private function getDataValueMapper(string $dataTypeName): ?ValueMapperInterface
+	{
+		if (!$this->valueMappers->has($dataTypeName)) {
+			$dataType = $this->getDataType($dataTypeName);
+			$valueMapper = $dataType->getValueMapper();
+
+			if (null === $valueMapper) {
+				$this->valueMappers->set($dataTypeName, $this->NOMAPPER);
+				return null;
+			}
+
+			$this->valueMappers->set($dataTypeName, $this->valueMapResolver->resolve($valueMapper));
+		}
+
+		$mapper = $this->valueMappers->get($dataTypeName);
+
+		return $mapper == $this->NOMAPPER ? null : $mapper;
+	}
 }

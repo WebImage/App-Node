@@ -35,6 +35,7 @@ class Plugin extends AbstractPlugin {
 	 */
 	public function load(ApplicationInterface $app)
 	{
+		parent::load($app);
 		$app->getServiceManager()->addServiceProvider(\WebImage\Node\Service\Db\RepositoryServiceProvider::class);
 		$this->install($app);
 	}

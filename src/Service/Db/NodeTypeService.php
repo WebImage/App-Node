@@ -17,6 +17,7 @@ use WebImage\Node\Defs\NodeTypeDef;
 use WebImage\Node\Defs\NodeTypeDefInterface;
 use WebImage\Node\Defs\NodeTypePropertyDef;
 use WebImage\Node\Entities\Node;
+use WebImage\Node\Entities\NodeRefInterface;
 use WebImage\Node\Entities\NodeType;
 use WebImage\Node\Entities\NodeTypeAssociation;
 use WebImage\Node\Service\NodeTypeServiceInterface;
@@ -826,7 +827,7 @@ class NodeTypeService implements NodeTypeServiceInterface
 	{
 		$nodeTypeService = $this->getRepository()->getNodeTypeService();
 		$type = $nodeTypeService->getNodeTypeByTypeQName($qname);
-		/** @var NodeRef $targetNodeRef */
+		/** @var NodeRefInterface $targetNodeRef */
 		$nodeRef = $type->getNode()->getNodeRef();
 
 		return $nodeRef->getNodeId();

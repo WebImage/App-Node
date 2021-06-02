@@ -44,7 +44,7 @@ class DataTypeModelField {
 	 */
 	public function getKey(): ?string
 	{
-		return $this->name;
+		return $this->key;
 	}
 
 	/**

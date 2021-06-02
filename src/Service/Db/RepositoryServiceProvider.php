@@ -7,6 +7,7 @@ use League\Container\ServiceProvider\AbstractServiceProvider;
 use WebImage\Application\ApplicationInterface;
 use WebImage\Config\Config;
 use WebImage\Db\ConnectionManager;
+use WebImage\Node\DataTypes\ValueMapper\ValueMapResolver;
 use WebImage\Node\Service\DictionaryService;
 use WebImage\Node\Service\Repository;
 use WebImage\Node\Service\RepositoryInterface;
@@ -44,7 +45,8 @@ class RepositoryServiceProvider extends AbstractServiceProvider
 			/**
 			 * Add data type service
 			 */
-			$dataTypeService = new DataTypeService();
+			$valueMapResolver = $container->get(ValueMapResolver::class);
+			$dataTypeService = new DataTypeService($valueMapResolver);
 			$dataTypeService->setRepository($repository);
 			$repository->setDataTypeService($dataTypeService);
 			/**

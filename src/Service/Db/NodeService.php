@@ -20,6 +20,7 @@ use WebImage\Node\Properties\Property;
 use WebImage\Node\Query\Query;
 use WebImage\Node\Query\QueryBuilder;
 use WebImage\Node\Service\NodeServiceInterface;
+use WebImage\Node\Service\NodeRef;
 use WebImage\Node\Service\QName;
 use WebImage\Node\Service\RepositoryAwareTrait;
 use WebImage\String\Uuid;
@@ -60,7 +61,7 @@ class NodeService implements NodeServiceInterface
 		]);
 	}
 
-	private function getNextAssocSortOrder(NodeAssociation $assoc, NodeRef $srcRef, NodeRef $tgtRef)
+	private function getNextAssocSortOrder(NodeAssociation $assoc, NodeRefInterface $srcRef, NodeRefInterface $tgtRef)
 	{
 		$sortorder = $this->getConnectionManager()
 			->createQueryBuilder()
@@ -100,15 +101,17 @@ class NodeService implements NodeServiceInterface
 		$this->assertNodeInstanceOf($tgt, $typeAssocDef->getTargetTypeQName(), $typeAssocDef->isTargetStrict(), $assoc->getDef()->getQName());
 
 		if (null === $srcRef) throw new \RuntimeException('Source must be saved before an association can be created');
-		else if (!($srcRef instanceof NodeRef)) throw new \RuntimeException('Source node has not been committed locally');
+//		else if (!($srcRef instanceof NodeRefInterface)) throw new \RuntimeException('Source node has not been committed locally');
 
 		if (null === $tgtRef) throw new \RuntimeException('Target must be saved before an association can be created');
-		else if (!($tgtRef instanceof NodeRef)) throw new \RuntimeException('Target node has not been committed locally');
+//		else if (!($tgtRef instanceof NodeRefInterface)) throw new \RuntimeException('Target node has not been committed locally');
 
 		$assocSrcCount = $this->getSourceAssocCount($src, $typeAssocDef);
 		$assocTgtCount = $this->getTargetAssocCount($tgt, $typeAssocDef);
 	}
+
 	private function getTargetAssocCount(Node $node, NodeTypeAssociationDef $typeAssocDef) {}
+
 	private function getSourceAssocCount(Node $node, NodeTypeAssociationDef $typeAssocDef)
 	{
 		$typeQNames = [$node->getTypeQName()];
@@ -169,10 +172,6 @@ class NodeService implements NodeServiceInterface
 		// Make sure that the object being passed contains a correct reference type
 		$nodeRef = $node->getNodeRef();
 
-		if (null !== $nodeRef && !($nodeRef instanceof NodeRef)) {
-			throw new Exception(get_class($nodeRef) . ' is currently not a supported node reference');
-		}
-
 		$new_node = (null === $node->getUuid());
 
 		$nodeType = $this->getRepository()->getNodeTypeService()->getNodeTypeByTypeQName($node->getTypeQName());
@@ -182,9 +181,10 @@ class NodeService implements NodeServiceInterface
 		$types[] = $nodeType;
 
 		// Make sure created as an actual value, otherwise set it to null so that the DataAccessObject will know to auto-set its date
-		$updated = date('Y-m-d H:i:s');
+		$updated = new \DateTime();// date('Y-m-d H:i:s');
 		$updatedBy = 0;
 		$typeService = $this->getRepository()->getNodeTypeService();
+		$dataTypeService = $this->getRepository()->getDataTypeService();
 		$tableNameHelper = $this->getTableNameHelper();
 
 		$baseType = $tableNameHelper->getRootType($typeService, $types);
@@ -202,8 +202,12 @@ class NodeService implements NodeServiceInterface
 			$node->setPropertyValue('type_qname', $nodeType->getDef()->getQName());
 
 			$data = [];
+
 			foreach($baseType->getDef()->getProperties() as $key => $property) {
-				$data[$key] = $node->getPropertyValue($key);
+				$dataType = $property->getDataType();
+				$value = $node->getPropertyValue($key);
+				$value = $dataTypeService->valueForStorage($dataType, $value);
+				$data[$key] = $value;
 			}
 
 			$this->insertRecord($baseTableKey, $data);
@@ -219,7 +223,10 @@ class NodeService implements NodeServiceInterface
 
 			$data = [];
 			foreach($baseType->getDef()->getProperties() as $key => $property) {
-				$data[$key] = $node->getPropertyValue($key);
+				$dataType = $property->getDataType();
+				$value = $node->getPropertyValue($key);
+				$value = $dataTypeService->valueForStorage($dataType, $value);
+				$data[$key] = $value;
 			}
 
 			$this->updateRecord($baseTableKey, $data, ['node_uuid' => $node->getUuid(), 'node_version' => $node->getVersion()]);
@@ -242,52 +249,39 @@ class NodeService implements NodeServiceInterface
 
 			/**
 			 * Iterate through properties for this type and attach to model
-			 * @var string $fieldName
+			 * @var string $propertyKey
 			 */
-			foreach($properties as $fieldName => $propertyDef) {
+			foreach($properties as $propertyKey => $propertyDef) {
 
 				// Check if this should be considered a primary key
-				if (in_array($fieldName, array('node_uuid', 'node_version'/*, 'profile', 'locale'*/))) {
+				if (in_array($propertyKey, array('node_uuid', 'node_version'/*, 'profile', 'locale'*/))) {
 
-					$primaryKeys[] = $fieldName;
+					$primaryKeys[] = $propertyKey;
 
-					switch ($fieldName) {
+					switch ($propertyKey) {
 						case 'node_uuid':
 							$typeData['node_uuid'] = $nodeRef->getUuid();
 							break;
 						case 'node_version':
 							$typeData['node_version'] = $nodeRef->getVersion();
 							break;
-//						case 'profile': // Not currently supported, so just assume that it applies to <all>
-//							if ($property_profile = $node->getProperty('profile')) $typeData['profile'] = $property_profile->getValue();
-//							break;
-//						case 'locale': // Not currently supported, so just assume that it applies to <all>
-//							if ($property_locale = $node->getProperty('locale')) $typeData['locale'] = $property_locale->getValue();
-//							break;
 					}
 
 				// Otherwise add it to the list of values to update
 				} else {
 					/** @var Property|MultiValueProperty $property */
-					$property = $node->getProperty($fieldName);
+					$property = $node->getProperty($propertyKey);
 
 					$propertyType = $propertyDef->getDataType();
 
-					$dataType = $this->getRepository()->getDataTypeService()->getDataType($propertyType);
+					$dataType = $dataTypeService->getDataType($propertyType);
 					if (null === $dataType) {
 						throw new \RuntimeException('Invalid data type: ' . $propertyType);
 					}
 
-					$dataTypeModelFields = $dataType->getModelFields();
-
-					$simpleType = $dataType->isSimpleStorage();
-
 					if ($propertyDef->isMultiValued()) {
-						// Do something
-						// $typeData[$fieldName] = $node_property->getValues();
-
-//						$propertyTableKey = 'cnt_prop_' . $fieldName;
-						$propertyTableKey = $typeDef->getTableKey() . '_p_' . $fieldName; //'cnt_prop_' . $fieldName;
+						die(__FILE__.':'.__LINE__.PHP_EOL);
+						$propertyTableKey = $typeDef->getTableKey() . '_p_' . $propertyKey; //'cnt_prop_' . $fieldName;
 
 						$qb = $this->getConnectionManager()->createQueryBuilder();
 
@@ -320,11 +314,11 @@ class NodeService implements NodeServiceInterface
 									die(__FILE__.':'.__LINE__.PHP_EOL);
 									while ($propertyValueField = $propertyValueFields->getNext()) {
 
-										if ($simpleType) {
-											$propertyValueFieldKey = $fieldName;
+										if ($dataType->isSimpleStorage()) {
+											$propertyValueFieldKey = $propertyKey;
 
 										} else {
-											$propertyValueFieldKey = $fieldName . '_' . $propertyValueField->getKey();
+											$propertyValueFieldKey = $propertyKey . '_' . $propertyValueField->getKey();
 											#echo 'Complex check: ' . $propertyValueFieldKey . "\n";
 										}
 
@@ -352,8 +346,8 @@ class NodeService implements NodeServiceInterface
 //								$qb = $this->getConnectionManager()->createQueryBuilder();
 //								$qb->insert($propertyTableKey)
 //									->values(['']
-echo 'Update to use convenience methods ->insertRecord and updateRecord<br>';
-die(__FILE__.':'.__LINE__.PHP_EOL);
+								echo 'Update to use convenience methods ->insertRecord and updateRecord<br>';
+								die(__FILE__.':'.__LINE__.PHP_EOL);
 								$propertyData = [
 									'node_uuid' => ':node_uuid',
 									'node_version' => ':version'
@@ -363,17 +357,17 @@ die(__FILE__.':'.__LINE__.PHP_EOL);
 									':version' => $nodeRef->getVersion()
 								];
 
-								if ($simpleType) {
+								if ($dataType->isSimpleStorage()) {
 
 									$value = $propertyValue->get('');
-									$propertyData[$fieldName] = ':field';
+									$propertyData[$propertyKey] = ':field';
 									$propertyParams[':field'] = $value;
 
 								} else { // complex, multiple value
-die(__FILE__.':'.__LINE__.PHP_EOL);
+									die(__FILE__.':'.__LINE__.PHP_EOL);
 									while ($propertyValueField = $propertyValueFields->getNext()) {
 
-										$propertyValueFieldKey = $fieldName . '_' . $propertyValueField->getKey();
+										$propertyValueFieldKey = $propertyKey . '_' . $propertyValueField->getKey();
 										$propertyValueFieldValue = $propertyValueField->getDef();
 
 										$struct->$propertyValueFieldKey = $propertyValueFieldValue;
@@ -421,19 +415,14 @@ die(__FILE__.':'.__LINE__.PHP_EOL);
 
 					} else {
 
-						if ($simpleType) {
+						$value = $dataTypeService->valueForStorage($propertyDef->getDataType(), $property->getValue());
 
-							$typeData[$fieldName] = $property->getValue();
-
+						if ($dataType->isSimpleStorage()) {
+							$typeData[$propertyKey] = $value;
 						} else {
-
-							$complexPropertyValue = $property->getValueDictionary();
-
-							foreach($dataTypeModelFields as $dataTypeModelField) {
-
-								$compositeFieldName = $fieldName . '_' . $dataTypeModelField->getKey();
-
-								$typeData[$compositeFieldName] = $complexPropertyValue->get($dataTypeModelField->getKey());
+							foreach($dataType->getModelFields() as $field) {
+								$compositeFieldName = $propertyKey . '_' . $field->getKey();
+								$typeData[$compositeFieldName] = $value[$field->getKey()];
 							}
 						}
 					}
@@ -442,7 +431,6 @@ die(__FILE__.':'.__LINE__.PHP_EOL);
 
 			// Check if this is a new record so that we can create it if necessary
 			$qb = $this->getConnectionManager()->createQueryBuilder();
-
 			$qb->select('COUNT(*) AS total')
 				->from($tableKey);
 
@@ -461,23 +449,14 @@ die(__FILE__.':'.__LINE__.PHP_EOL);
 			$result = $qb->execute()->fetch();
 
 			if ($result['total'] == 0) {
-				$this->getConnectionManager()
-					->createQueryBuilder()
-					->insert($tableKey)
-					->values(array_map(function() { return '?'; }, $typeData))
-					->setParameters(array_values($typeData))
-					->execute();
+				$this->insertRecord($tableKey, $typeData);
 			} else {
-				$updateQb = $this->getConnectionManager()
-					->createQueryBuilder()
-					->update($tableKey)
-					->values(array_map(function() { return '?'; }, $typeData))
-					->setParameters(array_values($typeData));
+				$where = [];
 				foreach($primaryKeys as $primaryKey) {
-					$qb->andWhere($primaryKey . ' = : ' . $primaryKey);
-					$qb->setParameter(':' . $primaryKey, $typeData[$primaryKey]);
+					$where[$primaryKey] = $typeData[$primaryKey];
 				}
-				$updateQb->execute();
+
+				$this->updateRecord($tableKey, $typeData, $where);
 			}
 		}
 
@@ -683,6 +662,7 @@ die(__FILE__.':'.__LINE__.PHP_EOL);
 					if ($dataType->isSimpleStorage()) {
 						$property->addValue($result[$propertyKey]);
 					} else {
+						die(__FILE__.':'.__LINE__.PHP_EOL);
 						$d = new Dictionary();
 						foreach($dataType->getModelFields() as $modelField) {
 							$fieldKey = $propertyKey . '_' . $modelField->getKey();
@@ -707,10 +687,12 @@ die(__FILE__.':'.__LINE__.PHP_EOL);
 
 		$results = $this->getNodeDataResultsForTypes($nodeUuids, $typeStack);
 		$typeService = $this->getRepository()->getNodeTypeService();
+		$dataTypeService = $this->getRepository()->getDataTypeService();
 		$tableNameHelper = $this->getTableNameHelper();
 		$rootType = $tableNameHelper->getRootType($typeService, $typeStack);
 		$rootTableKey = $tableNameHelper->getTableKeyFromDef($rootType->getDef());
 		$uuidAlias = $tableNameHelper->getColumnNameAlias($rootTableKey, 'node_uuid');
+		$resultHelper = $this->getResultHelper();
 
 		foreach($results as $result) {
 
@@ -727,46 +709,11 @@ die(__FILE__.':'.__LINE__.PHP_EOL);
 				$typeTableKey = $tableNameHelper->getTableKeyFromDef($typeDef);
 
 				$properties = $typeDef->getProperties();
+
 				/** @var NodeTypePropertyDef $propertyDef */
 				foreach($properties as $propertyDef) {
-
-					if ($propertyDef->isMultiValued()) {
-
-						$property = new MultiValueProperty();
-						$property->setDef($propertyDef);
-						$node->addProperty($propertyDef->getKey(), $property);
-
-					} else {
-
-						$dataType = $this->getRepository()->getDataTypeService()->getDataType($propertyDef->getDataType());
-
-						$property = new Property();
-						$property->setDef($propertyDef);
-						$columnKey = $propertyDef->getKey();
-
-						if (null === $dataType) { // This probably shouldn't happen, because $dataType should be valid... but just in case let's see if we can salvage some sort of value if the key exists in the table result set
-
-							$resultKey = $tableNameHelper->getColumnNameAlias($typeTableKey, $columnKey);
-							$value = isset($result[$resultKey]) ? $result[$resultKey] : null;
-							$property->setValue($value);
-							$node->addProperty($propertyDef->getKey(), $property);
-
-						} else {
-
-							$d = new Dictionary();
-
-							foreach($dataType->getModelFields() as $field) {
-								$key = $field->getKey() ? : '';
-								$resultKey = $tableNameHelper->getColumnNameAlias($typeTableKey, $columnKey, $field->getKey());
-								$value = isset($result[$resultKey]) ? $result[$resultKey] : null;
-								$d->set($key, $value);
-							}
-
-							$property->setValue($d);
-
-							$node->addProperty($propertyDef->getKey(), $property);
-						}
-					}
+					$property = $resultHelper->createPropertyFromData($typeTableKey, $propertyDef, $result);
+					$node->addProperty($propertyDef->getKey(), $property);
 				}
 			}
 		}
@@ -908,7 +855,7 @@ die(__FILE__.':'.__LINE__.PHP_EOL);
 		$srcRef = $srcNode->getNodeRef();
 		$tgtRef = $tgtNode->getNodeRef();
 
-		if (!($srcRef instanceof NodeRef) || !($tgtRef instanceof NodeRef)) return;
+		if (!($srcRef instanceof NodeRefInterface) || !($tgtRef instanceof NodeRefInterface)) return;
 
 		$assocDef = $this->getRepository()->getNodeTypeService()->getAssociationByQName($assocQName);
 		if (null === $assocDef) throw new \RuntimeException(sprintf('Invalid association type: %s', $assocQName));
@@ -940,9 +887,6 @@ die(__FILE__.':'.__LINE__.PHP_EOL);
 		$srcRef = $src->getNodeRef();
 		$tgtRef = $tgt->getNodeRef();
 
-		if (!($srcRef instanceof NodeRef)) throw new \InvalidArgumentException('Source node is not managed by this repository');
-		if (!($tgtRef instanceof NodeRef)) throw new \InvalidArgumentException('Target node is not managed by this repository');
-
 		$where = [
 			'assoc_qname' => $assocQName,
 			'src_node_uuid' => $srcRef->getUuid(),
@@ -959,12 +903,11 @@ die(__FILE__.':'.__LINE__.PHP_EOL);
 //	public function getAssociationsNodeRefsByAssociationTypeQName($node, $assocTypeQNname) {}
 
 	/**
-	 * @return NodeRef[]
+	 * @return NodeRefInterface[]
 	 */
 	public function getAssociatedNodeRefs(Node $node, $assocQName = null)
 	{
 		$ref = $node->getNodeRef();
-		if (!($ref instanceof NodeRef)) return [];
 
 		$nodeRefsData = $this->getConnectionManager()
 			->createQueryBuilder()
@@ -1096,5 +1039,13 @@ die(__FILE__.':'.__LINE__.PHP_EOL);
 	private function getTableNameHelper(): TableNameHelper
 	{
 		return new TableNameHelper();
+	}
+
+	public function getResultHelper(): ResultHelper
+	{
+		return new ResultHelper(
+			$this->getRepository()->getDataTypeService(),
+			$this->getTableNameHelper()
+		);
 	}
 }

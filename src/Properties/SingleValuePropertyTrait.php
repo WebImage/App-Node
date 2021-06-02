@@ -8,54 +8,28 @@ use WebImage\Core\ImmutableDictionary;
 trait SingleValuePropertyTrait
 {
 	/**
-	 * @property Dictionary
+	 * @property mixed
 	 */
 	private $value;
 
 	public function reset()
 	{
-		$this->value = new Dictionary();
+		$this->value = null;
 	}
 
 	/**
 	 * @inheritdoc
 	 */
-	public function getValue($subKey='')
+	public function getValue()
 	{
-		return $this->value->get($subKey);
+		return $this->value;
 	}
 
 	/**
 	 * @inheritdoc
 	 */
-	public function getValueDictionary()
+	public function setValue($value)
 	{
-		return new ImmutableDictionary($this->value->toArray());
-	}
-
-	/**
-	 * @inheritdoc
-	 */
-	public function setValue($value, $forSubKey='')
-	{
-		if (!is_string($forSubKey)) {
-			throw new \InvalidArgumentException('forSubKey must be a string value');
-		}
-
-		if (is_object($value)) {
-			if (!($value instanceof Dictionary)) throw new \InvalidArgumentException(sprintf('%s was expecting a Dictionary', __METHOD__));
-			if (!empty($forSubKey)) throw new \InvalidArgumentException(sprintf('%s should not receive a forSubKey value when specifying a Dictionary for $value'));
-		} else if (is_array($value)) {
-			if (!empty($forSubKey)) throw new \InvalidArgumentException(sprintf('%s should not receive a forSubKey value when specifying an array for $value'));
-			$value = new Dictionary($value);
-		} else if (is_string($value) || is_numeric($value) || null === $value) {
-			$newValue = $value;
-			$value = null === $this->value ? new Dictionary() : $this->value;
-			$value->set($forSubKey, $newValue);
-		} else {
-			throw new \InvalidArgumentException(sprintf('%s was expecting a scalar value', __METHOD__));
-		}
-
 		$this->value = $value;
 	}
 }

@@ -7,13 +7,12 @@ use WebImage\Core\Dictionary;
 use WebImage\Db\ConnectionManager;
 use WebImage\Node\Defs\NodeTypePropertyDef;
 use WebImage\Node\Entities\Node;
-use WebImage\Node\Properties\MultiValuePropertyInterface;
-use WebImage\Node\Properties\MultiValuePropertyValue;
 use WebImage\Node\Properties\Property;
 use WebImage\Node\Query\Filter;
 use WebImage\Node\Query\Property As QueryProperty;
 use WebImage\Node\Query\Query;
 use WebImage\Db\QueryBuilder As DbQueryBuilder;
+use WebImage\Node\Service\NodeRef;
 
 class NodeQueryService
 {
@@ -55,6 +54,7 @@ class NodeQueryService
 		if (null !== $query->getResultsPerPage()) $qb->setMaxResults($query->getResultsPerPage());
 
 		$results = $qb->execute()->fetchAll();
+
 		$nodes = $this->convertResultsToNodes($results, $rootTableKey);
 
 		return $nodes;
@@ -142,25 +142,9 @@ class NodeQueryService
 
 				$property = null;
 
-				if ($propertyDef->isMultiValued()) throw new \Exception('Multi valued properties are not yet supported'); // $property = new MultiValuePropertyValue();
+				if ($propertyDef->isMultiValued()) throw new \Exception('Multi valued properties are not yet supported');
 
-				$property = new Property();
-
-				$d = new Dictionary();
-				$property->setValue($d);
-
-				foreach($propertyDataType->getModelFields() as $field) {
-
-					$key = null === $field->getKey() ? '' : $field->getKey();
-					$column = $tableNameHelper->getColumnName($propertyTableKey, $propertyKey, $field->getKey());
-					$alias = $tableNameHelper->getColumnNameAlias($propertyTableKey, $propertyKey, $field->getKey());
-
-					if (!in_array($alias, $columns)) continue; // isset($result[$column]) does not work for nulls
-
-					$d->set($key, $result[$alias]);
-				}
-
-				$property->setDef($propertyDef);
+				$property = $this->getNodeService()->getResultHelper()->createPropertyFromData($propertyTableKey, $propertyDef, $result);
 				$node->addProperty($propertyKey, $property);
 			}
 		}
@@ -341,7 +325,7 @@ class NodeQueryService
 	{
 		foreach($query->getFilters() as $filter) {
 			$propertyColumns = $this->getColumnsForProperty($query, $filter);
-
+echo '<pre>';print_r($filter);print_r($propertyColumns);echo '<hr />' . __FILE__ .':'.__LINE__;exit;
 			foreach($propertyColumns as $propertyColumn) {
 				foreach($propertyColumn->getColumns() as $column) {
 					$alias = sprintf('%s_%s', $propertyColumn->getTableKey(), $column);

@@ -5,6 +5,34 @@ Rules
 ON CREATE ASSOCIATION Node.Types.ContactNote
 UPDATE Node.Type.Contact SET LastContacted = DATE()
 
+Views:
+    TableColumn
+    Detail
+    Form
+
+    DataType
+    Type.DataType
+    Property.DataType
+
+    PropertyRenderer::render($node, $propertyKey)
+        $value = $node->getPropertyValue($propertyKey);
+        $value = $dataTypeRenderer->render('WebImage.DataTypes.DateTime', $value);
+        $value = $typeRenderer->render('WebImage.Type.Company', 'WebImage.DataTypes.DateTime', $value);
+        $value = $propertyRenderer->render('WebImage.TypeCompany', $propertyKey, 'DataType', $value);)
+
+        // Context rendering (e.g. column, form, view)
+
+        // What if we want to render DateTime as "23 days ago"
+        // How to add render with link
+        VIEW: node/datatypes/datetime.php
+
+        class DateTimeDataTypeRenderer extends DataTypeRenderer
+
+        return $value;
+
+        WebImage.DataTypes.DateTime -> new DateTime()->format('m/d/Y'
+
+
 Fix default for node.created (date.now())
 
 $node->getPropertyValue('nodeRef') => Node
