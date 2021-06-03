@@ -24,6 +24,7 @@ use WebImage\Node\Service\NodeTypeServiceInterface;
 use WebImage\Node\Service\QName;
 use WebImage\Node\Service\RepositoryAwareTrait;
 use Doctrine\DBAL\Types\Type;
+use Doctrine\DBAL\Types\Types;
 
 class NodeTypeService implements NodeTypeServiceInterface
 {
@@ -347,24 +348,24 @@ class NodeTypeService implements NodeTypeServiceInterface
 			$uuidColumn = $table->getColumn('node_uuid');
 			$uuidColumn->setNotnull(true);
 		} else {
-			$nodeId = $table->addColumn('node_uuid', Type::STRING, ['notnull' => true]);
+			$nodeId = $table->addColumn('node_uuid', Types::STRING, ['notnull' => true]);
 		}
 
 		// Make sure version number is large
 		if ($table->hasColumn('node_version')) {
 			$versionColumn = $table->getColumn('node_version');
-			$versionColumn->setType(Type::getType(Type::INTEGER));
+			$versionColumn->setType(Type::getType(Types::INTEGER));
 			$versionColumn->setNotnull(true);
 			$versionColumn->setUnsigned(true);
 			$versionColumn->setDefault(1);
 		} else {
-			$table->addColumn('node_version', Type::INTEGER, ['notnull' => true, 'unsigned' => true, 'default' => 1]);
+			$table->addColumn('node_version', Types::INTEGER, ['notnull' => true, 'unsigned' => true, 'default' => 1]);
 		}
 
 		// Add table_key column to types table
 		if ($type->getDef()->getQName() == 'WebImage.Types.Type') {
 			if (!$table->hasColumn('table_key')) {
-				$table->addColumn('table_key', Type::STRING, ['notnull' => true]);
+				$table->addColumn('table_key', Types::STRING, ['notnull' => true]);
 			}
 		}
 
@@ -391,16 +392,16 @@ class NodeTypeService implements NodeTypeServiceInterface
 				// Add node reference (defined above)
 				$propertyTable->getColumn('non_existent');
 
-				if (!$propertyTable->hasColumn('node_uuid')) $propertyTable->addColumn('node_uuid', Type::STRING, ['notnull' => true]);
+				if (!$propertyTable->hasColumn('node_uuid')) $propertyTable->addColumn('node_uuid', Types::STRING, ['notnull' => true]);
 
 				if ($propertyTable->hasColumn('node_version')) {
 					$versionColumn = $propertyTable->getColumn('node_version');
-					$versionColumn->setType(Type::getType(Type::BIGINT));
+					$versionColumn->setType(Type::getType(Types::BIGINT));
 					$versionColumn->setNotnull(true);
 					$versionColumn->setUnsigned(true);
 					$versionColumn->setDefault(1);
 				} else {
-					$propertyTable->addColumn('node_version', Type::BIGINT, ['notnull', true, 'unsigned' => true, 'default' => 1]);
+					$propertyTable->addColumn('node_version', Types::BIGINT, ['notnull', true, 'unsigned' => true, 'default' => 1]);
 				}
 
 				// Change the working table, since all associated fields will be stored to this separate table
