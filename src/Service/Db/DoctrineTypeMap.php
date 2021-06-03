@@ -3,17 +3,17 @@
 namespace WebImage\Node\Service\Db;
 
 use WebImage\Node\DataTypes\Type;
-use Doctrine\DBAL\Types\Type as DoctrineType;
+use Doctrine\DBAL\Types\Types as DoctrineType;
 
 class DoctrineTypeMap {
 	protected $typeMap = [
-		Type::BOOLEAN => DoctrineType::BOOLEAN,
-		Type::DATETIME => DoctrineType::DATETIME,
-		Type::DATE => DoctrineType::DATE,
-		Type::DECIMAL => DoctrineType::DECIMAL,
-		Type::INTEGER => DoctrineType::INTEGER,
-		Type::STRING => DoctrineType::STRING,
-		Type::TEXT => DoctrineType::TEXT,
+		Type::BOOLEAN => DoctrineTypesBOOLEAN,
+		Type::DATETIME => DoctrineTypesDATETIME,
+		Type::DATE => DoctrineTypesDATE,
+		Type::DECIMAL => DoctrineTypesDECIMAL,
+		Type::INTEGER => DoctrineTypesINTEGER,
+		Type::STRING => DoctrineTypesSTRING,
+		Type::TEXT => DoctrineTypesTEXT,
 	];
 
 	public function hasTypeMapping($nodePropertyType) {
