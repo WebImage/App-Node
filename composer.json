@@ -1,0 +1,12 @@
+{
+    "name": "webimage/app-node",
+    "description": "Node application plugin",
+    "type": "library",
+    "authors": [
+        {
+            "name": "Robert Jones II",
+            "email": "rjones@corporatewebimage.com"
+        }
+    ],
+    "require": {}
+}
