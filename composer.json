@@ -8,7 +8,7 @@
             "email": "rjones@corporatewebimage.com"
         }
     ],
-    "require": {
+    "autoload": {
         "psr-4": {
             "WebImage\\Node\\": "src/"
         }
