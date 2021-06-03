@@ -8,8 +8,8 @@ use Doctrine\DBAL\Types\Types as DoctrineTypes;
 class DoctrineTypeMap {
 	protected $typeMap = [
 		Type::BOOLEAN => DoctrineTypes::BOOLEAN,
-		Type::DATETIME => DoctrineTypes::DATETIME,
-		Type::DATE => DoctrineTypes::DATE,
+		Type::DATETIME => DoctrineTypes::DATETIME_MUTABLE,
+		Type::DATE => DoctrineTypes::DATE_MUTABLE,
 		Type::DECIMAL => DoctrineTypes::DECIMAL,
 		Type::INTEGER => DoctrineTypes::INTEGER,
 		Type::STRING => DoctrineTypes::STRING,
