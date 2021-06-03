@@ -7,10 +7,5 @@
     "name": "Robert Jones II",
     "email": "rjones@corporatewebimage.com",
     "website": "https://www.corporatewebimage.com"
-  },
-  "requirements": {
-    "plugins": {
-      "webimage/form": "1"
-    }
   }
 }
