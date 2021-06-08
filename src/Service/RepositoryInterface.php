@@ -54,7 +54,7 @@ interface RepositoryInterface
 	/**
 	 * Set the data type service
 	 *
-	 * @param DataTypeServiceInterface $dataTypeService
+	 * @param DataTypeServiceInterface $service
 	 */
-	public function setDataTypeService(DataTypeServiceInterface $dataTypeService);
+	public function setDataTypeService(DataTypeServiceInterface $service);
 }

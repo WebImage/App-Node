@@ -75,6 +75,7 @@ class Repository implements RepositoryInterface
 	 */
 	public function setNodeService(NodeServiceInterface $service)
 	{
+		$service->setRepository($this);
 		$this->nodeService = $service;
 	}
 
@@ -85,6 +86,7 @@ class Repository implements RepositoryInterface
 	 */
 	public function setNodeTypeService(NodeTypeServiceInterface $service)
 	{
+		$service->setRepository($this);
 		$this->nodeTypeService = $service;
 	}
 
@@ -95,16 +97,18 @@ class Repository implements RepositoryInterface
 	 */
 	public function setDictionaryService(DictionaryService $service)
 	{
+		$service->setRepository($this);
 		$this->dictionaryService = $service;
 	}
 
 	/**
 	 * Set the data type service
 	 *
-	 * @param DataTypeServiceInterface $dataTypeService
+	 * @param DataTypeServiceInterface $service
 	 */
-	public function setDataTypeService(DataTypeServiceInterface $dataTypeService)
+	public function setDataTypeService(DataTypeServiceInterface $service)
 	{
-		$this->dataTypeService = $dataTypeService;
+		$service->setRepository($this);
+		$this->dataTypeService = $service;
 	}
 }
