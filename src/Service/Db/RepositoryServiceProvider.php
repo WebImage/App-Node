@@ -40,49 +40,6 @@ class RepositoryServiceProvider extends AbstractServiceProvider
 		$this->registerNodeTypeService($container);
 		$this->registerDataTypeService($container);
 		$this->registerDictionaryService($container);
-
-//		$container->share(RepositoryInterface::class, function() use ($container) {
-//
-//			/** @var ApplicationInterface $app */
-//			$app = $container->get(ApplicationInterface::class);
-//			$config = $app->getConfig();
-//
-//			/** @var ConnectionManager $connectionManager */
-//			$connectionManager = $container->get(ConnectionManager::class);
-//
-//			$repository = new Repository();
-//
-//			$nodeService = new NodeService($connectionManager);
-//			$nodeService->setRepository($repository);
-//			$repository->setNodeService($nodeService);
-//
-//			/**
-//			 * Add node type service
-//			 */
-//			$nodeTypeService = new NodeTypeService($connectionManager);
-//			$nodeTypeService->setRepository($repository);
-//			$repository->setNodeTypeService($nodeTypeService);
-//			/**
-//			 * Add data type service
-//			 */
-//			$valueMapResolver = $container->get(ValueMapResolver::class);
-//			$dataTypeService = new DataTypeService($valueMapResolver);
-//			$dataTypeService->setRepository($repository);
-//			$repository->setDataTypeService($dataTypeService);
-//			/**
-//			 * Add dictionary
-//			 */
-//			$localNamespace = $app->getConfig()->get('nodes.localNamespace');
-//			$dictionary = new DictionaryService($localNamespace);
-//			$dictionary->setRepository($repository);
-//			$repository->setDictionaryService($dictionary);
-//
-//			$config_file = __DIR__ . '/../../../config/dictionary.php';
-//			$config = new Config(require($config_file));
-//			$dictionary->addConfig($config);
-//
-//			return $repository;
-//		});
 	}
 
 	protected function registerRepository(ContainerInterface $container)
@@ -92,14 +49,13 @@ class RepositoryServiceProvider extends AbstractServiceProvider
 			$repository->setNodeService($container->get(NodeServiceInterface::class));
 			$repository->setNodeTypeService($container->get(NodeTypeServiceInterface::class));
 			$repository->setDataTypeService($container->get(DataTypeServiceInterface::class));
-			#$repository->setDictionaryService($container->get(DictionaryService::class));
 
 			$localNamespace = $container->get(ApplicationInterface::class)->getConfig()->get('nodes.localNamespace');
 
 			$dictionary = new DictionaryService($localNamespace);
 			$dictionary->setRepository($repository);
 			$repository->setDictionaryService($dictionary);
-			
+
 			$config_file = __DIR__ . '/../../../config/dictionary.php';
 
 			$config = new Config(require($config_file));
@@ -115,9 +71,6 @@ class RepositoryServiceProvider extends AbstractServiceProvider
 		$def = $container->share(NodeServiceInterface::class, function () use ($container) {
 			return new NodeService($container->get(ConnectionManager::class));
 		});
-
-		#$def->withArgument(RepositoryInterface::class);
-		#$def->withMethodCall('setRepository', [$container->get(RepositoryInterface::class)]);
 	}
 
 	protected function registerNodeTypeService(ContainerInterface $container)
